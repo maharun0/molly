@@ -1,0 +1,18 @@
+# Build output
+build/
+out/
+
+# Logs
+logs/
+
+# ImGui runtime layout state (written next to the running exe's cwd)
+imgui.ini
+
+# IDE / tooling
+.vs/
+*.user
+CMakeUserPresets.json
+
+# OS
+Thumbs.db
+.DS_Store
