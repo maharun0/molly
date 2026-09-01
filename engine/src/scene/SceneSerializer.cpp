@@ -1,6 +1,8 @@
 #include "molly/scene/SceneSerializer.h"
 
 #include <filesystem>
+
+#include "molly/audio/AudioComponents.h"
 #include <fstream>
 #include <functional>
 #include <unordered_map>
@@ -290,6 +292,37 @@ const std::vector<ComponentEntry>& componentRegistry() {
                          auto it = in.find("Script");
                          if (it == in.end()) return;
                          e.addComponent<ScriptComponent>().scriptPath = it->value("scriptPath", "");
+                     }});
+
+        r.push_back({"AudioSource",
+                     [](json& out, Entity e) {
+                         if (!e.hasComponent<AudioSourceComponent>()) return;
+                         auto& src = e.getComponent<AudioSourceComponent>();
+                         out["AudioSource"] = {{"clipPath", src.clipPath},
+                                               {"volume", src.volume},
+                                               {"loop", src.loop},
+                                               {"is3D", src.is3D},
+                                               {"autoPlay", src.autoPlay}};
+                     },
+                     [](const json& in, Entity e) {
+                         auto it = in.find("AudioSource");
+                         if (it == in.end()) return;
+                         auto& src = e.addComponent<AudioSourceComponent>();
+                         src.clipPath = it->value("clipPath", "");
+                         src.volume = it->value("volume", 1.0f);
+                         src.loop = it->value("loop", false);
+                         src.is3D = it->value("is3D", true);
+                         src.autoPlay = it->value("autoPlay", true);
+                     }});
+
+        r.push_back({"AudioListener",
+                     [](json& out, Entity e) {
+                         if (!e.hasComponent<AudioListenerComponent>()) return;
+                         out["AudioListener"] = json::object();
+                     },
+                     [](const json& in, Entity e) {
+                         if (in.find("AudioListener") == in.end()) return;
+                         e.addComponent<AudioListenerComponent>();
                      }});
 
         return r;

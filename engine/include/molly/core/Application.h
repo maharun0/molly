@@ -3,6 +3,7 @@
 #include <memory>
 #include <string>
 
+#include "molly/audio/AudioEngine.h"
 #include "molly/core/Events/WindowEvent.h"
 #include "molly/core/LayerStack.h"
 #include "molly/core/Window.h"
@@ -29,6 +30,7 @@ public:
 
     Window& getWindow() { return *m_window; }
     ResourceManager& getResourceManager() { return m_resourceManager; }
+    AudioEngine& getAudioEngine() { return m_audioEngine; }
     static Application& get() { return *s_instance; }
 
 private:
@@ -44,6 +46,7 @@ private:
 
     std::unique_ptr<Window> m_window;
     ResourceManager m_resourceManager;
+    AudioEngine m_audioEngine;
     ImGuiLayer* m_imguiLayer = nullptr;
     LayerStack m_layerStack;
     bool m_running = true;

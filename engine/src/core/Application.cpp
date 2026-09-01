@@ -24,11 +24,16 @@ Application::Application(const std::string& name) {
         m_window->presentFrame();
     });
 
+    m_audioEngine.init();
+
     m_imguiLayer = new ImGuiLayer();
     pushOverlay(m_imguiLayer);
 }
 
-Application::~Application() { s_instance = nullptr; }
+Application::~Application() {
+    m_audioEngine.shutdown();
+    s_instance = nullptr;
+}
 
 void Application::pushLayer(Layer* layer) { m_layerStack.pushLayer(layer); }
 

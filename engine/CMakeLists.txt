@@ -17,6 +17,7 @@ target_link_libraries(molly-engine
         Jolt::Jolt
         sol2
         json
+        miniaudio
     PRIVATE
         molly_warnings
         molly_sanitizers

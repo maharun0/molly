@@ -2,8 +2,11 @@
 
 #include <unordered_map>
 
+#include "molly/audio/AudioComponents.h"
+#include "molly/core/Application.h"
 #include "molly/ecs/Components.h"
 #include "molly/ecs/Entity.h"
+#include "molly/ecs/Systems/AudioSystem.h"
 #include "molly/ecs/Systems/CameraSystem.h"
 #include "molly/ecs/Systems/CharacterControllerSystem.h"
 #include "molly/ecs/Systems/PhysicsSyncSystem.h"
@@ -63,6 +66,10 @@ void Scene::onUpdate(float dt) {
     stepPhysics(m_registry, m_physicsWorld, m_physicsAccumulator, dt);
     updateCharacterControllers(m_registry, m_physicsWorld, dt);
     updateScripts(m_registry, m_scriptEngine, dt);
+    // Audio hardware is a single shared device, so unlike PhysicsWorld/
+    // ScriptEngine, AudioEngine is owned once by Application (not per-Scene)
+    // — see PLAN.md §16.1 and the note in Milestone 9's commit about why.
+    updateAudio(m_registry, Application::get().getAudioEngine());
 }
 
 std::unique_ptr<Scene> Scene::clone() const {
@@ -121,6 +128,20 @@ std::unique_ptr<Scene> Scene::clone() const {
             // `instance`/`started` left default — the clone's own
             // ScriptEngine (a different sol::state) loads its own instance.
             clone->m_registry.emplace<ScriptComponent>(newEntity, copy);
+        }
+        if (auto* c = m_registry.try_get<AudioSourceComponent>(oldEntity)) {
+            AudioSourceComponent copy;
+            copy.clipPath = c->clipPath;
+            copy.volume = c->volume;
+            copy.loop = c->loop;
+            copy.is3D = c->is3D;
+            copy.autoPlay = c->autoPlay;
+            // `sound`/`started` left default — aliasing the source scene's
+            // ma_sound would double-play/double-free it on shutdown.
+            clone->m_registry.emplace<AudioSourceComponent>(newEntity, std::move(copy));
+        }
+        if (m_registry.all_of<AudioListenerComponent>(oldEntity)) {
+            clone->m_registry.emplace<AudioListenerComponent>(newEntity);
         }
     }
 

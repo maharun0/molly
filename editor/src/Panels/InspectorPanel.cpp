@@ -125,6 +125,20 @@ void InspectorPanel::onImGuiRender(Scene* scene, Entity selected) {
         ImGui::TextDisabled(script.started ? "Running" : "Not started yet");
     });
 
+    drawComponent<AudioSourceComponent>("Audio Source", selected, [](AudioSourceComponent& src) {
+        editString("Clip Path", src.clipPath);
+        ImGui::DragFloat("Volume", &src.volume, 0.02f, 0.0f, 2.0f);
+        ImGui::Checkbox("Loop", &src.loop);
+        ImGui::Checkbox("3D (Positional)", &src.is3D);
+        ImGui::Checkbox("Auto Play", &src.autoPlay);
+        ImGui::TextDisabled(src.sound ? "Loaded" : "Not loaded yet");
+    });
+
+    drawComponent<AudioListenerComponent>("Audio Listener", selected,
+                                           [](AudioListenerComponent&) {
+                                               ImGui::TextDisabled("No fields — marker component.");
+                                           });
+
     ImGui::End();
 }
 
@@ -153,6 +167,12 @@ void InspectorPanel::drawAddComponentMenu(Entity entity) {
         }
         if (!entity.hasComponent<ScriptComponent>() && ImGui::MenuItem("Script")) {
             entity.addComponent<ScriptComponent>();
+        }
+        if (!entity.hasComponent<AudioSourceComponent>() && ImGui::MenuItem("Audio Source")) {
+            entity.addComponent<AudioSourceComponent>();
+        }
+        if (!entity.hasComponent<AudioListenerComponent>() && ImGui::MenuItem("Audio Listener")) {
+            entity.addComponent<AudioListenerComponent>();
         }
         ImGui::EndPopup();
     }

@@ -105,6 +105,16 @@ void GameLayer::onAttach() {
     playerController.radius = 0.3f;
     playerController.height = 1.8f;
     m_playerEntity.addComponent<ScriptComponent>().scriptPath = "assets/scripts/player.lua";
+    // The player is the natural "ears" of the scene for a top-down game.
+    m_playerEntity.addComponent<AudioListenerComponent>();
+
+    // Background music: non-positional, looping, starts automatically.
+    Entity music = m_scene.createEntity("BackgroundMusic");
+    auto& musicSource = music.addComponent<AudioSourceComponent>();
+    musicSource.clipPath = "assets/audio/music_loop.wav";
+    musicSource.loop = true;
+    musicSource.is3D = false;
+    musicSource.volume = 0.5f;
 
     // Directional light
     Entity light = m_scene.createEntity("Sun");
@@ -139,13 +149,13 @@ void GameLayer::onUpdate(float dt) {
 }
 
 void GameLayer::onImGuiRender() {
-    ImGui::Begin("Molly Demo - Milestone 5");
-    ImGui::Text("Scripting: player movement + trigger callbacks are Lua, not C++.");
+    ImGui::Begin("Molly Demo - Milestone 9");
+    ImGui::Text("Audio: looping background music + a positional trigger chime.");
     ImGui::Text("Frame time: %.3f ms (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate,
                 ImGui::GetIO().Framerate);
     ImGui::Text("WASD (handled in assets/scripts/player.lua) to move the blue capsule.");
-    ImGui::Text("Walk through the yellow trigger zone and watch the log for enter/exit");
-    ImGui::Text("messages (assets/scripts/trigger_zone.lua).");
+    ImGui::Text("Walk through the yellow trigger zone to hear a chime and see enter/exit");
+    ImGui::Text("logged (assets/scripts/trigger_zone.lua).");
 
     if (ImGui::Button("Spawn Cube")) {
         ++m_spawnCounter;

@@ -3,6 +3,9 @@
 // Umbrella header for consumers of the engine (editor, game). Engine
 // internals should include specific headers directly rather than this file.
 
+#include "molly/audio/AudioComponents.h"
+#include "molly/audio/AudioEngine.h"
+
 #include "molly/core/Application.h"
 #include "molly/core/Assert.h"
 #include "molly/core/Layer.h"
@@ -18,6 +21,7 @@
 #include "molly/ecs/Components.h"
 #include "molly/ecs/Entity.h"
 #include "molly/ecs/Scene.h"
+#include "molly/ecs/Systems/AudioSystem.h"
 #include "molly/ecs/Systems/CameraSystem.h"
 #include "molly/ecs/Systems/CharacterControllerSystem.h"
 #include "molly/ecs/Systems/PhysicsSyncSystem.h"

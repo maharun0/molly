@@ -86,6 +86,13 @@ void ScriptEngine::registerBindings() {
 
     molly.set_function("log", [](const std::string& message) { APP_INFO("{0}", message); });
 
+    molly.set_function("play_sound", [](Entity /*entity*/, const std::string& clipPath) {
+        // Untracked, non-positional one-shot — matches AudioEngine::playOneShot
+        // (PLAN.md §16.3). `entity` is accepted per the planned API shape for a
+        // future positional variant but isn't used yet.
+        Application::get().getAudioEngine().playOneShot(clipPath);
+    });
+
     sol::table input = molly.create_named("input");
     input.set_function("is_key_down", [](int key) {
         auto* window = Application::get().getWindow().getNativeWindow();

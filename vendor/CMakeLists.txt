@@ -33,6 +33,10 @@ target_link_libraries(molly-imgui PUBLIC glfw glad)
 add_library(stb INTERFACE)
 target_include_directories(stb INTERFACE stb)
 
+# --- miniaudio (header-only) ---------------------------------------------
+add_library(miniaudio INTERFACE)
+target_include_directories(miniaudio INTERFACE miniaudio)
+
 # --- Jolt Physics ---------------------------------------------------------
 # Building as a subdirectory (not the top-level project) already makes
 # Jolt's own CMakeLists.txt skip its unit tests/samples/viewer targets.
