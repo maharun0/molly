@@ -12,17 +12,19 @@ GameLayer::GameLayer() : Layer("GameLayer") {}
 void GameLayer::onAttach() {
     glEnable(GL_DEPTH_TEST);
 
-    // Enabled here (not in molly-demo's build config generally) mainly to
-    // exercise/prove the watcher end-to-end; a shipped game has no real
-    // need to watch its own asset files for changes (PLAN.md §14.4).
+    // Enabled here (not in a shipped build generally) mainly to exercise the
+    // watcher end-to-end; a real shipped game has no need to watch its own
+    // asset files for changes (PLAN.md §14.4).
+    Application::get().getResourceManager().setHotReloadEnabled(true);
+
+    buildScene();
+}
+
+void GameLayer::buildScene() {
+    m_scene = std::make_unique<Scene>();
+
     auto& resources = Application::get().getResourceManager();
-    resources.setHotReloadEnabled(true);
-
     auto shader = resources.loadShader("assets/shaders/lit.vert", "assets/shaders/lit.frag");
-
-    m_material = std::make_shared<Material>();
-    m_material->shader = shader;
-    m_material->albedoColor = {0.85f, 0.65f, 0.35f};
 
     auto floorMaterial = std::make_shared<Material>();
     floorMaterial->shader = shader;
@@ -31,71 +33,58 @@ void GameLayer::onAttach() {
 
     auto wallMaterial = std::make_shared<Material>();
     wallMaterial->shader = shader;
-    wallMaterial->albedoColor = {0.5f, 0.3f, 0.3f};
+    wallMaterial->albedoColor = {0.45f, 0.42f, 0.4f};
+
+    auto pillarMaterial = std::make_shared<Material>();
+    pillarMaterial->shader = shader;
+    pillarMaterial->albedoColor = {0.5f, 0.3f, 0.3f};
 
     auto playerMaterial = std::make_shared<Material>();
     playerMaterial->shader = shader;
     playerMaterial->albedoColor = {0.3f, 0.6f, 0.9f};
 
-    auto triggerMaterial = std::make_shared<Material>();
-    triggerMaterial->shader = shader;
-    triggerMaterial->albedoColor = {0.9f, 0.9f, 0.2f};
+    // --- Arena (PLAN.md §31.6): a single bounded arena, perimeter walls +
+    // a couple of interior pillars for cover/movement variety. ---
+    constexpr float kArenaHalfSize = 10.0f;
 
-    auto boxMeshes = resources.loadModel("assets/models/box/Box.gltf");
-    std::shared_ptr<Mesh> boxMesh = boxMeshes.empty() ? Mesh::createCube() : boxMeshes[0];
-
-    // Static floor: a large flat box collider under a plane mesh.
-    Entity floor = m_scene.createEntity("Floor");
+    Entity floor = m_scene->createEntity("Floor");
     floor.getComponent<TransformComponent>().position = {0.0f, -0.6f, 0.0f};
     auto& floorRenderer = floor.addComponent<MeshRendererComponent>();
-    floorRenderer.mesh = Mesh::createPlane(20.0f);
+    floorRenderer.mesh = Mesh::createPlane(kArenaHalfSize * 2.0f);
     floorRenderer.material = floorMaterial;
     floor.addComponent<RigidBodyComponent>().type = BodyType::Static;
     auto& floorCollider = floor.addComponent<ColliderComponent>();
     floorCollider.shape = ColliderShape::Box;
-    floorCollider.halfExtents = {10.0f, 0.1f, 10.0f};
+    floorCollider.halfExtents = {kArenaHalfSize, 0.1f, kArenaHalfSize};
 
-    // A couple of static wall obstacles to prove collision/sliding works.
-    auto addWall = [&](const char* name, glm::vec3 position, glm::vec3 halfExtents) {
-        Entity wall = m_scene.createEntity(name);
-        auto& t = wall.getComponent<TransformComponent>();
+    auto addBox = [&](const char* name, glm::vec3 position, glm::vec3 halfExtents,
+                       std::shared_ptr<Material> material) {
+        Entity box = m_scene->createEntity(name);
+        auto& t = box.getComponent<TransformComponent>();
         t.position = position;
         t.scale = halfExtents * 2.0f;
-        auto& renderer = wall.addComponent<MeshRendererComponent>();
+        auto& renderer = box.addComponent<MeshRendererComponent>();
         renderer.mesh = Mesh::createCube();
-        renderer.material = wallMaterial;
-        wall.addComponent<RigidBodyComponent>().type = BodyType::Static;
-        auto& collider = wall.addComponent<ColliderComponent>();
+        renderer.material = material;
+        box.addComponent<RigidBodyComponent>().type = BodyType::Static;
+        auto& collider = box.addComponent<ColliderComponent>();
         collider.shape = ColliderShape::Box;
         collider.halfExtents = halfExtents;
     };
-    addWall("Wall1", {3.0f, 0.5f, 0.0f}, {0.5f, 0.5f, 2.0f});
-    addWall("Wall2", {-3.0f, 0.5f, 2.0f}, {1.5f, 0.5f, 0.5f});
 
-    // Trigger volume: logs enter/exit as the player walks through it.
-    Entity trigger = m_scene.createEntity("TriggerZone");
-    trigger.getComponent<TransformComponent>().position = {0.0f, 0.5f, -3.0f};
-    trigger.getComponent<TransformComponent>().scale = {2.0f, 1.0f, 2.0f};
-    auto& triggerRenderer = trigger.addComponent<MeshRendererComponent>();
-    triggerRenderer.mesh = Mesh::createCube();
-    triggerRenderer.material = triggerMaterial;
-    trigger.addComponent<RigidBodyComponent>().type = BodyType::Static;
-    auto& triggerCollider = trigger.addComponent<ColliderComponent>();
-    triggerCollider.shape = ColliderShape::Box;
-    triggerCollider.halfExtents = {1.0f, 0.5f, 1.0f};
-    triggerCollider.isTrigger = true;
-    trigger.addComponent<ScriptComponent>().scriptPath = "assets/scripts/trigger_zone.lua";
+    constexpr float kWallHeight = 1.0f;
+    constexpr float kWallThickness = 0.25f;
+    addBox("WallNorth", {0.0f, kWallHeight, -kArenaHalfSize}, {kArenaHalfSize, kWallHeight, kWallThickness}, wallMaterial);
+    addBox("WallSouth", {0.0f, kWallHeight, kArenaHalfSize}, {kArenaHalfSize, kWallHeight, kWallThickness}, wallMaterial);
+    addBox("WallEast", {kArenaHalfSize, kWallHeight, 0.0f}, {kWallThickness, kWallHeight, kArenaHalfSize}, wallMaterial);
+    addBox("WallWest", {-kArenaHalfSize, kWallHeight, 0.0f}, {kWallThickness, kWallHeight, kArenaHalfSize}, wallMaterial);
 
-    // Rotating prop (unrelated to physics — kept from Milestone 3 as a visual anchor).
-    m_propEntity = m_scene.createEntity("Prop");
-    m_propEntity.getComponent<TransformComponent>().position = {0.0f, 2.0f, 2.5f};
-    auto& propRenderer = m_propEntity.addComponent<MeshRendererComponent>();
-    propRenderer.mesh = boxMesh;
-    propRenderer.material = m_material;
+    addBox("Pillar1", {3.0f, 0.6f, 0.0f}, {0.5f, 0.6f, 0.5f}, pillarMaterial);
+    addBox("Pillar2", {-3.5f, 0.6f, 2.5f}, {0.5f, 0.6f, 0.5f}, pillarMaterial);
+    addBox("Pillar3", {-2.0f, 0.6f, -4.0f}, {0.6f, 0.6f, 0.6f}, pillarMaterial);
 
-    // Player: kinematic character controller, capsule visualized as a scaled cube.
-    m_playerEntity = m_scene.createEntity("Player");
-    m_playerEntity.getComponent<TransformComponent>().position = {0.0f, 0.0f, 3.0f};
+    // --- Player ---
+    m_playerEntity = m_scene->createEntity("Player");
     m_playerEntity.getComponent<TransformComponent>().scale = {0.6f, 1.8f, 0.6f};
     auto& playerRenderer = m_playerEntity.addComponent<MeshRendererComponent>();
     playerRenderer.mesh = Mesh::createCube();
@@ -104,78 +93,112 @@ void GameLayer::onAttach() {
     playerController.speed = 3.5f;
     playerController.radius = 0.3f;
     playerController.height = 1.8f;
+    auto& playerHealth = m_playerEntity.addComponent<HealthComponent>();
+    playerHealth.maxHealth = 100.0f;
+    playerHealth.health = 100.0f;
     m_playerEntity.addComponent<ScriptComponent>().scriptPath = "assets/scripts/player.lua";
-    // The player is the natural "ears" of the scene for a top-down game.
     m_playerEntity.addComponent<AudioListenerComponent>();
 
-    // Background music: non-positional, looping, starts automatically.
-    Entity music = m_scene.createEntity("BackgroundMusic");
+    // --- Wave manager (invisible — drives the core loop, PLAN.md §31.3) ---
+    Entity waveManager = m_scene->createEntity("WaveManager");
+    waveManager.addComponent<ScriptComponent>().scriptPath = "assets/scripts/wave_manager.lua";
+
+    // --- Background music ---
+    Entity music = m_scene->createEntity("BackgroundMusic");
     auto& musicSource = music.addComponent<AudioSourceComponent>();
     musicSource.clipPath = "assets/audio/music_loop.wav";
     musicSource.loop = true;
     musicSource.is3D = false;
     musicSource.volume = 0.5f;
 
-    // Directional light
-    Entity light = m_scene.createEntity("Sun");
+    // --- Directional light ---
+    Entity light = m_scene->createEntity("Sun");
     light.getComponent<TransformComponent>().rotation = {-45.0f, 45.0f, 0.0f};
     auto& lightComp = light.addComponent<LightComponent>();
     lightComp.type = LightType::Directional;
     lightComp.color = {1.0f, 0.96f, 0.9f};
     lightComp.intensity = 1.1f;
 
-    // Camera: fixed top-down-angled view over the whole test arena.
-    m_cameraEntity = m_scene.createEntity("MainCamera");
-    auto& cameraComp = m_cameraEntity.addComponent<CameraComponent>();
+    // --- Camera: fixed top-down-angled view over the whole arena ---
+    Entity camera = m_scene->createEntity("MainCamera");
+    auto& cameraComp = camera.addComponent<CameraComponent>();
     auto& window = Application::get().getWindow();
     float aspect = static_cast<float>(window.getWidth()) / static_cast<float>(window.getHeight());
     cameraComp.camera = PerspectiveCamera(55.0f, aspect, 0.1f, 100.0f);
-    cameraComp.camera.setPosition({0.0f, 7.0f, 9.0f});
+    cameraComp.camera.setPosition({0.0f, 13.0f, 15.0f});
     cameraComp.camera.setPitchYaw(-55.0f, -90.0f);
     cameraComp.primary = true;
 }
 
 void GameLayer::onUpdate(float dt) {
-    m_time += dt;
-
-    auto& transform = m_propEntity.getComponent<TransformComponent>();
-    transform.rotation.y = m_time * 35.0f;
+    if (m_restartRequested) {
+        m_restartRequested = false;
+        buildScene();
+    }
 
     glClearColor(0.05f, 0.05f, 0.08f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    m_scene.onUpdate(dt);
-    m_scene.onRender();
+    m_scene->onUpdate(dt);
+    m_scene->onRender();
+}
+
+static sol::optional<sol::table> getGameState(Scene& scene) {
+    sol::state& lua = scene.getScriptEngine().getLuaState();
+    return lua["GameState"];
+}
+
+void GameLayer::drawHud() {
+    auto gameState = getGameState(*m_scene);
+    if (!gameState) return;
+    sol::table gs = *gameState;
+
+    float health = gs.get_or("playerHealth", 100.0f);
+    float maxHealth = gs.get_or("playerMaxHealth", 100.0f);
+    int wave = gs.get_or("wave", 0);
+    bool gameOver = gs.get_or("gameOver", false);
+    bool victory = gs.get_or("victory", false);
+
+    ImGui::SetNextWindowPos(ImVec2(20, 20), ImGuiCond_Always);
+    ImGui::SetNextWindowBgAlpha(0.35f);
+    ImGui::Begin("##HUD", nullptr,
+                  ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+                      ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings);
+    ImGui::Text("Wave %d", wave);
+    float healthFrac = maxHealth > 0.0f ? health / maxHealth : 0.0f;
+    ImGui::ProgressBar(healthFrac < 0.0f ? 0.0f : healthFrac, ImVec2(200, 0),
+                        (std::to_string(static_cast<int>(health > 0 ? health : 0)) + " / " +
+                         std::to_string(static_cast<int>(maxHealth)))
+                            .c_str());
+    ImGui::End();
+
+    if (gameOver || victory) {
+        ImGuiViewport* viewport = ImGui::GetMainViewport();
+        ImGui::SetNextWindowPos(viewport->GetCenter(), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+        ImGui::Begin("##EndScreen", nullptr,
+                      ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+                          ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings);
+        if (victory) {
+            ImGui::Text("VICTORY — all waves cleared!");
+        } else {
+            ImGui::Text("GAME OVER — you survived to wave %d", wave);
+        }
+        if (ImGui::Button("Restart", ImVec2(120, 0))) {
+            m_restartRequested = true;
+        }
+        ImGui::End();
+    }
 }
 
 void GameLayer::onImGuiRender() {
-    ImGui::Begin("Molly Demo - Milestone 9");
-    ImGui::Text("Audio: looping background music + a positional trigger chime.");
+    drawHud();
+
+    ImGui::Begin("Molly Demo - Milestone 10");
+    ImGui::Text("The demo game: wave-survival arena combat.");
     ImGui::Text("Frame time: %.3f ms (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate,
                 ImGui::GetIO().Framerate);
-    ImGui::Text("WASD (handled in assets/scripts/player.lua) to move the blue capsule.");
-    ImGui::Text("Walk through the yellow trigger zone to hear a chime and see enter/exit");
-    ImGui::Text("logged (assets/scripts/trigger_zone.lua).");
-
-    if (ImGui::Button("Spawn Cube")) {
-        ++m_spawnCounter;
-        Entity cube = m_scene.createEntity("SpawnedCube" + std::to_string(m_spawnCounter));
-        auto& t = cube.getComponent<TransformComponent>();
-        t.position = {static_cast<float>((m_spawnCounter % 5) - 2) * 1.5f, 3.0f,
-                       static_cast<float>((m_spawnCounter / 5) % 5) * 1.5f - 1.5f};
-        t.scale = glm::vec3(0.5f);
-        auto& renderer = cube.addComponent<MeshRendererComponent>();
-        renderer.mesh = Mesh::createCube();
-        renderer.material = m_material;
-        cube.addComponent<RigidBodyComponent>().type = BodyType::Dynamic;
-        auto& collider = cube.addComponent<ColliderComponent>();
-        collider.shape = ColliderShape::Box;
-        collider.halfExtents = glm::vec3(0.25f);
-    }
-    ImGui::SameLine();
-    ImGui::TextDisabled("(dynamic boxes fall onto the floor under gravity)");
-
-    ImGui::Text("Entities: %d", static_cast<int>(m_scene.getRegistry().view<TagComponent>().size()));
+    ImGui::Text("WASD to move. Left click: melee. Right click: ranged.");
+    ImGui::Text("Survive the waves — all logic in assets/scripts/*.lua.");
     ImGui::End();
 }
 

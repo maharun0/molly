@@ -54,4 +54,14 @@ struct LightComponent {
     float radius = 10.0f;
 };
 
+// Shared, cross-script-accessible damage state (Milestone 10). Deliberately
+// engine data rather than Lua-local script state: combat is fundamentally
+// "one entity damages a different entity," which a script's own local
+// closure variables can't express — any script can read/write another
+// entity's entity.health through the bound Entity usertype.
+struct HealthComponent {
+    float maxHealth = 100.0f;
+    float health = 100.0f;
+};
+
 }  // namespace molly

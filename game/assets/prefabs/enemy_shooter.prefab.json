@@ -1,0 +1,27 @@
+{
+  "molly_version": "0.10.0",
+  "entities": [
+    {
+      "id": 0,
+      "components": {
+        "Tag": { "name": "Enemy" },
+        "Transform": {
+          "position": [0.0, 0.0, 0.0],
+          "rotation": [0.0, 0.0, 0.0],
+          "scale": [0.5, 1.4, 0.5]
+        },
+        "MeshRenderer": {
+          "mesh": { "source": "Cube", "size": 1.0 },
+          "material": {
+            "albedoColor": [0.55, 0.2, 0.8],
+            "vertexShader": "assets/shaders/lit.vert",
+            "fragmentShader": "assets/shaders/lit.frag"
+          }
+        },
+        "CharacterController": { "speed": 1.8, "radius": 0.25, "height": 1.4 },
+        "Health": { "maxHealth": 25.0, "health": 25.0 },
+        "Script": { "scriptPath": "assets/scripts/enemy_shooter.lua" }
+      }
+    }
+  ]
+}

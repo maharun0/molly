@@ -143,6 +143,9 @@ std::unique_ptr<Scene> Scene::clone() const {
         if (m_registry.all_of<AudioListenerComponent>(oldEntity)) {
             clone->m_registry.emplace<AudioListenerComponent>(newEntity);
         }
+        if (auto* c = m_registry.try_get<HealthComponent>(oldEntity)) {
+            clone->m_registry.emplace<HealthComponent>(newEntity, *c);
+        }
     }
 
     return clone;

@@ -134,6 +134,11 @@ void InspectorPanel::onImGuiRender(Scene* scene, Entity selected) {
         ImGui::TextDisabled(src.sound ? "Loaded" : "Not loaded yet");
     });
 
+    drawComponent<HealthComponent>("Health", selected, [](HealthComponent& h) {
+        ImGui::DragFloat("Max Health", &h.maxHealth, 1.0f, 1.0f, 10000.0f);
+        ImGui::DragFloat("Health", &h.health, 1.0f, 0.0f, h.maxHealth);
+    });
+
     drawComponent<AudioListenerComponent>("Audio Listener", selected,
                                            [](AudioListenerComponent&) {
                                                ImGui::TextDisabled("No fields — marker component.");
@@ -173,6 +178,9 @@ void InspectorPanel::drawAddComponentMenu(Entity entity) {
         }
         if (!entity.hasComponent<AudioListenerComponent>() && ImGui::MenuItem("Audio Listener")) {
             entity.addComponent<AudioListenerComponent>();
+        }
+        if (!entity.hasComponent<HealthComponent>() && ImGui::MenuItem("Health")) {
+            entity.addComponent<HealthComponent>();
         }
         ImGui::EndPopup();
     }

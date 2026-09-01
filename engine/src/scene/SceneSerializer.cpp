@@ -325,6 +325,20 @@ const std::vector<ComponentEntry>& componentRegistry() {
                          e.addComponent<AudioListenerComponent>();
                      }});
 
+        r.push_back({"Health",
+                     [](json& out, Entity e) {
+                         if (!e.hasComponent<HealthComponent>()) return;
+                         auto& h = e.getComponent<HealthComponent>();
+                         out["Health"] = {{"maxHealth", h.maxHealth}, {"health", h.health}};
+                     },
+                     [](const json& in, Entity e) {
+                         auto it = in.find("Health");
+                         if (it == in.end()) return;
+                         auto& h = e.addComponent<HealthComponent>();
+                         h.maxHealth = it->value("maxHealth", 100.0f);
+                         h.health = it->value("health", h.maxHealth);
+                     }});
+
         return r;
     }();
     return registry;

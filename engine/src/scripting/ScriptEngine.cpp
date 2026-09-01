@@ -48,12 +48,21 @@ void ScriptEngine::registerBindings() {
         "Transform", "position", &TransformComponent::position, "rotation",
         &TransformComponent::rotation, "scale", &TransformComponent::scale);
 
+    m_lua.new_usertype<HealthComponent>("Health", "maxHealth", &HealthComponent::maxHealth, "health",
+                                         &HealthComponent::health);
+
     m_lua.new_usertype<Entity>(
         "Entity", "tag",
         sol::property([](Entity& e) -> std::string { return e.getComponent<TagComponent>().name; }),
         "transform",
         sol::property([](Entity& e) -> TransformComponent& { return e.getComponent<TransformComponent>(); }),
-        "is_valid", [](Entity& e) { return static_cast<bool>(e); });
+        "health",
+        sol::property([](Entity& e) -> HealthComponent& {
+            if (!e.hasComponent<HealthComponent>()) e.addComponent<HealthComponent>();
+            return e.getComponent<HealthComponent>();
+        }),
+        "has_health", [](Entity& e) { return e.hasComponent<HealthComponent>(); }, "is_valid",
+        [](Entity& e) { return static_cast<bool>(e); });
 
     sol::table molly = m_lua.create_named_table("molly");
 
@@ -83,6 +92,33 @@ void ScriptEngine::registerBindings() {
     molly.set_function("move_character", [this](Entity entity, float dirX, float dirZ, float speed) {
         moveCharacter(m_scene->getRegistry(), entity, glm::vec2(dirX, dirZ), speed);
     });
+
+    // Spatial query used for melee/ranged targeting (Milestone 10) — finds
+    // the nearest entity tagged `tag` within `maxDistance` of `origin`.
+    // Grown here rather than added earlier because nothing needed it until
+    // combat did (PLAN.md Appendix B's "grows incrementally" note).
+    molly.set_function(
+        "find_closest_entity", [this](glm::vec3 origin, const std::string& tag, float maxDistance) -> sol::object {
+            entt::entity closest = entt::null;
+            float closestDistSq = maxDistance * maxDistance;
+
+            auto view = m_scene->getRegistry().view<TagComponent, TransformComponent>();
+            for (auto entity : view) {
+                auto& t = view.get<TagComponent>(entity);
+                if (t.name != tag) continue;
+
+                auto& transform = view.get<TransformComponent>(entity);
+                glm::vec3 diff = transform.position - origin;
+                float distSq = glm::dot(diff, diff);
+                if (distSq <= closestDistSq) {
+                    closestDistSq = distSq;
+                    closest = entity;
+                }
+            }
+
+            if (closest == entt::null) return sol::lua_nil;
+            return sol::make_object(m_lua, Entity(closest, m_scene));
+        });
 
     molly.set_function("log", [](const std::string& message) { APP_INFO("{0}", message); });
 
