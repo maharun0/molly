@@ -17,6 +17,7 @@ public:
 private:
     void updateEditorCamera(float dt);
     void drawHierarchyPanel();
+    void renderViewport();
 
     Scene m_scene;
     Entity m_selected;

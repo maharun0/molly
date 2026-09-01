@@ -33,6 +33,18 @@ target_link_libraries(molly-imgui PUBLIC glfw glad)
 add_library(stb INTERFACE)
 target_include_directories(stb INTERFACE stb)
 
+# --- Jolt Physics ---------------------------------------------------------
+# Building as a subdirectory (not the top-level project) already makes
+# Jolt's own CMakeLists.txt skip its unit tests/samples/viewer targets.
+# USE_STATIC_MSVC_RUNTIME_LIBRARY defaults ON, which links Jolt against the
+# static CRT (/MT) while every other target here uses the dynamic CRT
+# (/MD, CMake's default) — that mismatch caused duplicate CRT symbol
+# errors (LNK2005) at final link time. Force it off so Jolt matches.
+set(DOUBLE_PRECISION OFF CACHE BOOL "" FORCE)
+set(ENABLE_ALL_WARNINGS OFF CACHE BOOL "" FORCE)
+set(USE_STATIC_MSVC_RUNTIME_LIBRARY OFF CACHE BOOL "" FORCE)
+add_subdirectory(JoltPhysics/Build)
+
 # --- Assimp (importer list trimmed to what the demo game needs) ---------
 set(ASSIMP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(ASSIMP_BUILD_ASSIMP_TOOLS OFF CACHE BOOL "" FORCE)

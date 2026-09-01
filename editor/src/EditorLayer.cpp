@@ -96,8 +96,28 @@ void EditorLayer::updateEditorCamera(float dt) {
 }
 
 void EditorLayer::onUpdate(float dt) {
+    // Simulation only — no rendering here. The framebuffer's size is only
+    // known once the Viewport panel lays out during onImGuiRender, so the
+    // scene is rendered from renderViewport() (called from onImGuiRender),
+    // right after resizing the framebuffer and before displaying it. Doing
+    // the render here would draw at last frame's size, and any resize that
+    // happens afterward would display a freshly-allocated, never-rendered
+    // texture (undefined GPU memory contents) for one frame — this was the
+    // cause of the ghosting/glitching seen while resizing or redocking
+    // panels: it repeated every single frame during a drag.
     updateEditorCamera(dt);
     m_scene.onUpdate(dt);
+}
+
+void EditorLayer::renderViewport() {
+    ImVec2 size = ImGui::GetContentRegionAvail();
+    if (size.x > 0 && size.y > 0 &&
+        (static_cast<uint32_t>(size.x) != m_framebuffer->getSpec().width ||
+         static_cast<uint32_t>(size.y) != m_framebuffer->getSpec().height)) {
+        m_framebuffer->resize(static_cast<uint32_t>(size.x), static_cast<uint32_t>(size.y));
+        m_viewportSize = {size.x, size.y};
+        m_editorCamera.setAspectRatio(size.x / size.y);
+    }
 
     m_framebuffer->bind();
     glClearColor(0.10f, 0.10f, 0.12f, 1.0f);
@@ -107,6 +127,9 @@ void EditorLayer::onUpdate(float dt) {
                 m_editorCamera.getPosition());
 
     m_framebuffer->unbind();
+
+    ImGui::Image(static_cast<ImTextureID>(static_cast<intptr_t>(m_framebuffer->getColorAttachmentRendererId())),
+                 size, ImVec2(0, 1), ImVec2(1, 0));
 }
 
 void EditorLayer::drawHierarchyPanel() {
@@ -166,17 +189,8 @@ void EditorLayer::onImGuiRender() {
     ImGui::Begin("Viewport");
     m_viewportFocused = ImGui::IsWindowFocused() || ImGui::IsWindowHovered();
 
-    ImVec2 size = ImGui::GetContentRegionAvail();
-    if (size.x > 0 && size.y > 0 &&
-        (static_cast<uint32_t>(size.x) != m_framebuffer->getSpec().width ||
-         static_cast<uint32_t>(size.y) != m_framebuffer->getSpec().height)) {
-        m_framebuffer->resize(static_cast<uint32_t>(size.x), static_cast<uint32_t>(size.y));
-        m_viewportSize = {size.x, size.y};
-        m_editorCamera.setAspectRatio(size.x / size.y);
-    }
+    renderViewport();
 
-    ImGui::Image(static_cast<ImTextureID>(static_cast<intptr_t>(m_framebuffer->getColorAttachmentRendererId())),
-                 size, ImVec2(0, 1), ImVec2(1, 0));
     ImGui::End();
     ImGui::PopStyleVar();
 }

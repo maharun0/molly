@@ -33,6 +33,13 @@ private:
     bool onWindowClose(WindowCloseEvent& e);
     bool onWindowResize(WindowResizeEvent& e);
 
+    // Runs one layer-update + ImGui-render pass, without presenting or
+    // polling events — shared by the normal run() loop and the window's
+    // refresh callback (see Window::setRefreshCallback), which needs to
+    // redraw mid-frame while the OS blocks event polling during a window
+    // drag/resize.
+    void renderFrame(float dt);
+
     std::unique_ptr<Window> m_window;
     ImGuiLayer* m_imguiLayer = nullptr;
     LayerStack m_layerStack;

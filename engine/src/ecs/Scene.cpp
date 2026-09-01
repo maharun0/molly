@@ -3,10 +3,16 @@
 #include "molly/ecs/Components.h"
 #include "molly/ecs/Entity.h"
 #include "molly/ecs/Systems/CameraSystem.h"
+#include "molly/ecs/Systems/CharacterControllerSystem.h"
+#include "molly/ecs/Systems/PhysicsSyncSystem.h"
 #include "molly/ecs/Systems/RenderSystem.h"
 #include "molly/core/Log.h"
 
 namespace molly {
+
+Scene::Scene() { m_physicsWorld.init(); }
+
+Scene::~Scene() { m_physicsWorld.shutdown(); }
 
 Entity Scene::createEntity(const std::string& name) {
     Entity entity(m_registry.create(), this);
@@ -27,9 +33,9 @@ Entity Scene::findEntityByName(const std::string& name) {
     return {};
 }
 
-void Scene::onUpdate(float /*dt*/) {
-    // Milestone 3 scope: no physics/scripts yet (Milestones 4/5). Nothing to
-    // simulate per-frame beyond what onRender reads directly.
+void Scene::onUpdate(float dt) {
+    stepPhysics(m_registry, m_physicsWorld, m_physicsAccumulator, dt);
+    updateCharacterControllers(m_registry, m_physicsWorld, dt);
 }
 
 void Scene::onRender() {

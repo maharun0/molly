@@ -19,7 +19,14 @@
 #include "molly/ecs/Entity.h"
 #include "molly/ecs/Scene.h"
 #include "molly/ecs/Systems/CameraSystem.h"
+#include "molly/ecs/Systems/CharacterControllerSystem.h"
+#include "molly/ecs/Systems/PhysicsSyncSystem.h"
 #include "molly/ecs/Systems/RenderSystem.h"
+
+#include "molly/physics/CollisionLayers.h"
+#include "molly/physics/ContactListener.h"
+#include "molly/physics/PhysicsComponents.h"
+#include "molly/physics/PhysicsWorld.h"
 
 #include "molly/renderer/Buffer.h"
 #include "molly/renderer/Camera.h"

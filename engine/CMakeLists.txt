@@ -14,6 +14,7 @@ target_link_libraries(molly-engine
         spdlog::spdlog
         stb
         assimp::assimp
+        Jolt::Jolt
     PRIVATE
         molly_warnings
         molly_sanitizers

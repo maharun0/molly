@@ -5,6 +5,8 @@
 #include <glad/gl.h>
 #include <imgui.h>
 
+#include <GLFW/glfw3.h>
+
 namespace molly {
 
 GameLayer::GameLayer() : Layer("GameLayer") {}
@@ -22,23 +24,80 @@ void GameLayer::onAttach() {
     floorMaterial->shader = shader;
     floorMaterial->albedoColor = {0.35f, 0.38f, 0.42f};
 
+    auto wallMaterial = std::make_shared<Material>();
+    wallMaterial->shader = shader;
+    wallMaterial->albedoColor = {0.5f, 0.3f, 0.3f};
+
+    auto playerMaterial = std::make_shared<Material>();
+    playerMaterial->shader = shader;
+    playerMaterial->albedoColor = {0.3f, 0.6f, 0.9f};
+
+    auto triggerMaterial = std::make_shared<Material>();
+    triggerMaterial->shader = shader;
+    triggerMaterial->albedoColor = {0.9f, 0.9f, 0.2f};
+
     auto boxMeshes = ModelLoader::load("assets/models/box/Box.gltf");
     std::shared_ptr<Mesh> boxMesh = boxMeshes.empty() ? Mesh::createCube() : boxMeshes[0];
-    auto floorMesh = Mesh::createPlane(10.0f);
 
-    // Floor
+    // Static floor: a large flat box collider under a plane mesh.
     Entity floor = m_scene.createEntity("Floor");
     floor.getComponent<TransformComponent>().position = {0.0f, -0.6f, 0.0f};
     auto& floorRenderer = floor.addComponent<MeshRendererComponent>();
-    floorRenderer.mesh = floorMesh;
+    floorRenderer.mesh = Mesh::createPlane(20.0f);
     floorRenderer.material = floorMaterial;
+    floor.addComponent<RigidBodyComponent>().type = BodyType::Static;
+    auto& floorCollider = floor.addComponent<ColliderComponent>();
+    floorCollider.shape = ColliderShape::Box;
+    floorCollider.halfExtents = {10.0f, 0.1f, 10.0f};
 
-    // Rotating prop
+    // A couple of static wall obstacles to prove collision/sliding works.
+    auto addWall = [&](const char* name, glm::vec3 position, glm::vec3 halfExtents) {
+        Entity wall = m_scene.createEntity(name);
+        auto& t = wall.getComponent<TransformComponent>();
+        t.position = position;
+        t.scale = halfExtents * 2.0f;
+        auto& renderer = wall.addComponent<MeshRendererComponent>();
+        renderer.mesh = Mesh::createCube();
+        renderer.material = wallMaterial;
+        wall.addComponent<RigidBodyComponent>().type = BodyType::Static;
+        auto& collider = wall.addComponent<ColliderComponent>();
+        collider.shape = ColliderShape::Box;
+        collider.halfExtents = halfExtents;
+    };
+    addWall("Wall1", {3.0f, 0.5f, 0.0f}, {0.5f, 0.5f, 2.0f});
+    addWall("Wall2", {-3.0f, 0.5f, 2.0f}, {1.5f, 0.5f, 0.5f});
+
+    // Trigger volume: logs enter/exit as the player walks through it.
+    Entity trigger = m_scene.createEntity("TriggerZone");
+    trigger.getComponent<TransformComponent>().position = {0.0f, 0.5f, -3.0f};
+    trigger.getComponent<TransformComponent>().scale = {2.0f, 1.0f, 2.0f};
+    auto& triggerRenderer = trigger.addComponent<MeshRendererComponent>();
+    triggerRenderer.mesh = Mesh::createCube();
+    triggerRenderer.material = triggerMaterial;
+    trigger.addComponent<RigidBodyComponent>().type = BodyType::Static;
+    auto& triggerCollider = trigger.addComponent<ColliderComponent>();
+    triggerCollider.shape = ColliderShape::Box;
+    triggerCollider.halfExtents = {1.0f, 0.5f, 1.0f};
+    triggerCollider.isTrigger = true;
+
+    // Rotating prop (unrelated to physics — kept from Milestone 3 as a visual anchor).
     m_propEntity = m_scene.createEntity("Prop");
-    m_propEntity.getComponent<TransformComponent>().position = {0.0f, 0.0f, 0.0f};
+    m_propEntity.getComponent<TransformComponent>().position = {0.0f, 2.0f, 2.5f};
     auto& propRenderer = m_propEntity.addComponent<MeshRendererComponent>();
     propRenderer.mesh = boxMesh;
     propRenderer.material = m_material;
+
+    // Player: kinematic character controller, capsule visualized as a scaled cube.
+    m_playerEntity = m_scene.createEntity("Player");
+    m_playerEntity.getComponent<TransformComponent>().position = {0.0f, 0.0f, 3.0f};
+    m_playerEntity.getComponent<TransformComponent>().scale = {0.6f, 1.8f, 0.6f};
+    auto& playerRenderer = m_playerEntity.addComponent<MeshRendererComponent>();
+    playerRenderer.mesh = Mesh::createCube();
+    playerRenderer.material = playerMaterial;
+    auto& playerController = m_playerEntity.addComponent<CharacterControllerComponent>();
+    playerController.speed = 3.5f;
+    playerController.radius = 0.3f;
+    playerController.height = 1.8f;
 
     // Directional light
     Entity light = m_scene.createEntity("Sun");
@@ -48,19 +107,33 @@ void GameLayer::onAttach() {
     lightComp.color = {1.0f, 0.96f, 0.9f};
     lightComp.intensity = 1.1f;
 
-    // Camera
+    // Camera: fixed top-down-angled view over the whole test arena.
     m_cameraEntity = m_scene.createEntity("MainCamera");
     auto& cameraComp = m_cameraEntity.addComponent<CameraComponent>();
     auto& window = Application::get().getWindow();
     float aspect = static_cast<float>(window.getWidth()) / static_cast<float>(window.getHeight());
-    cameraComp.camera = PerspectiveCamera(50.0f, aspect, 0.1f, 100.0f);
-    cameraComp.camera.setPosition({0.0f, 2.2f, 3.0f});
-    cameraComp.camera.setPitchYaw(-45.0f, -90.0f);
+    cameraComp.camera = PerspectiveCamera(55.0f, aspect, 0.1f, 100.0f);
+    cameraComp.camera.setPosition({0.0f, 7.0f, 9.0f});
+    cameraComp.camera.setPitchYaw(-55.0f, -90.0f);
     cameraComp.primary = true;
+}
+
+void GameLayer::handlePlayerInput(float /*dt*/) {
+    auto* window = Application::get().getWindow().getNativeWindow();
+
+    glm::vec2 direction{0.0f};
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) direction.y -= 1.0f;
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) direction.y += 1.0f;
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) direction.x -= 1.0f;
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) direction.x += 1.0f;
+
+    auto& controller = m_playerEntity.getComponent<CharacterControllerComponent>();
+    moveCharacter(m_scene.getRegistry(), m_playerEntity, direction, controller.speed);
 }
 
 void GameLayer::onUpdate(float dt) {
     m_time += dt;
+    handlePlayerInput(dt);
 
     auto& transform = m_propEntity.getComponent<TransformComponent>();
     transform.rotation.y = m_time * 35.0f;
@@ -73,22 +146,30 @@ void GameLayer::onUpdate(float dt) {
 }
 
 void GameLayer::onImGuiRender() {
-    ImGui::Begin("Molly Demo - Milestone 3");
-    ImGui::Text("ECS: entities/components drive the scene (entt).");
+    ImGui::Begin("Molly Demo - Milestone 4");
+    ImGui::Text("Physics: Jolt rigid bodies, character controller, trigger volumes.");
     ImGui::Text("Frame time: %.3f ms (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate,
                 ImGui::GetIO().Framerate);
+    ImGui::Text("WASD to move the blue player capsule. Walk through the yellow");
+    ImGui::Text("trigger zone and watch the log for enter/exit messages.");
 
     if (ImGui::Button("Spawn Cube")) {
         ++m_spawnCounter;
         Entity cube = m_scene.createEntity("SpawnedCube" + std::to_string(m_spawnCounter));
         auto& t = cube.getComponent<TransformComponent>();
-        t.position = {static_cast<float>((m_spawnCounter % 5) - 2) * 1.5f, 0.5f,
+        t.position = {static_cast<float>((m_spawnCounter % 5) - 2) * 1.5f, 3.0f,
                        static_cast<float>((m_spawnCounter / 5) % 5) * 1.5f - 1.5f};
         t.scale = glm::vec3(0.5f);
         auto& renderer = cube.addComponent<MeshRendererComponent>();
         renderer.mesh = Mesh::createCube();
         renderer.material = m_material;
+        cube.addComponent<RigidBodyComponent>().type = BodyType::Dynamic;
+        auto& collider = cube.addComponent<ColliderComponent>();
+        collider.shape = ColliderShape::Box;
+        collider.halfExtents = glm::vec3(0.25f);
     }
+    ImGui::SameLine();
+    ImGui::TextDisabled("(dynamic boxes fall onto the floor under gravity)");
 
     ImGui::Text("Entities: %d", static_cast<int>(m_scene.getRegistry().view<TagComponent>().size()));
     ImGui::End();

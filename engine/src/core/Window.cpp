@@ -68,6 +68,11 @@ void Window::init(const WindowProps& props) {
         if (data.eventCallback) data.eventCallback(event);
     });
 
+    glfwSetWindowRefreshCallback(m_window, [](GLFWwindow* window) {
+        auto& data = *static_cast<WindowData*>(glfwGetWindowUserPointer(window));
+        if (data.refreshCallback) data.refreshCallback();
+    });
+
     glfwSetWindowCloseCallback(m_window, [](GLFWwindow* window) {
         auto& data = *static_cast<WindowData*>(glfwGetWindowUserPointer(window));
         WindowCloseEvent event;
@@ -141,9 +146,11 @@ void Window::shutdown() {
 }
 
 void Window::onUpdate() {
-    glfwPollEvents();
     glfwSwapBuffers(m_window);
+    glfwPollEvents();
 }
+
+void Window::presentFrame() { glfwSwapBuffers(m_window); }
 
 void Window::setVSync(bool enabled) {
     glfwSwapInterval(enabled ? 1 : 0);

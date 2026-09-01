@@ -19,6 +19,10 @@ Application::Application(const std::string& name) {
     props.title = name;
     m_window = std::make_unique<Window>(props);
     m_window->setEventCallback([this](Event& e) { onEvent(e); });
+    m_window->setRefreshCallback([this]() {
+        renderFrame(0.0f);
+        m_window->presentFrame();
+    });
 
     m_imguiLayer = new ImGuiLayer();
     pushOverlay(m_imguiLayer);
@@ -59,6 +63,16 @@ bool Application::onWindowResize(WindowResizeEvent& e) {
     return false;
 }
 
+void Application::renderFrame(float dt) {
+    if (!m_minimized) {
+        for (Layer* layer : m_layerStack) layer->onUpdate(dt);
+    }
+
+    m_imguiLayer->begin();
+    for (Layer* layer : m_layerStack) layer->onImGuiRender();
+    m_imguiLayer->end();
+}
+
 void Application::run() {
     while (m_running) {
         float time = Time::getSeconds();
@@ -67,14 +81,7 @@ void Application::run() {
 
         if (dt > 0.1f) dt = 0.1f;
 
-        if (!m_minimized) {
-            for (Layer* layer : m_layerStack) layer->onUpdate(dt);
-        }
-
-        m_imguiLayer->begin();
-        for (Layer* layer : m_layerStack) layer->onImGuiRender();
-        m_imguiLayer->end();
-
+        renderFrame(dt);
         m_window->onUpdate();
     }
 }
