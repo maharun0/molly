@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <string>
 
 #include <entt/entt.hpp>
@@ -24,6 +25,14 @@ public:
     void destroyEntity(Entity entity);
 
     Entity findEntityByName(const std::string& name);
+
+    // Deep-copies entities/components into a fresh Scene for Play mode
+    // (PLAN.md §18.4). Runtime-only fields (physics body ids, character
+    // controller refs, script instances) are reset rather than copied, so
+    // the clone lazily recreates its own independent runtime state instead
+    // of aliasing this scene's Jolt bodies / Lua tables. Read-only asset
+    // references (Mesh/Material shared_ptrs) are shared, not duplicated.
+    std::unique_ptr<Scene> clone() const;
 
     // Steps physics (fixed-timestep accumulator), character controllers,
     // and scripts. No separate edit/play mode split yet (Milestone 7) —

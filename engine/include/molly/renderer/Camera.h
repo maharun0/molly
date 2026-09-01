@@ -24,6 +24,7 @@ public:
 
     void setAspectRatio(float aspectRatio) { m_aspectRatio = aspectRatio; recalculate(); }
     void setFov(float fovDegrees) { m_fovDegrees = fovDegrees; recalculate(); }
+    float getFov() const { return m_fovDegrees; }
 
     glm::vec3 getForward() const { return m_forward; }
     glm::vec3 getRight() const { return m_right; }

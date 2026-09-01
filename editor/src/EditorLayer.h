@@ -4,7 +4,15 @@
 
 #include <molly/Molly.h>
 
+#include "Panels/ConsolePanel.h"
+#include "Panels/ContentBrowserPanel.h"
+#include "Panels/InspectorPanel.h"
+#include "Panels/SceneHierarchyPanel.h"
+#include "Panels/ViewportPanel.h"
+
 namespace molly {
+
+enum class EditorPlayState { Edit, Playing, Paused };
 
 class EditorLayer : public Layer {
 public:
@@ -15,20 +23,25 @@ public:
     void onImGuiRender() override;
 
 private:
-    void updateEditorCamera(float dt);
-    void drawHierarchyPanel();
-    void renderViewport();
+    void buildDefaultScene();
+    void drawToolbar();
+    Scene* activeScene();
 
-    Scene m_scene;
-    Entity m_selected;
+    void onPlay();
+    void onStop();
+    void onPause();
+
+    std::unique_ptr<Scene> m_editScene;
+    std::unique_ptr<Scene> m_runtimeScene;
+    EditorPlayState m_playState = EditorPlayState::Edit;
+
     std::shared_ptr<Material> m_material;
-    std::shared_ptr<Framebuffer> m_framebuffer;
 
-    PerspectiveCamera m_editorCamera;
-
-    bool m_viewportFocused = false;
-    glm::vec2 m_viewportSize{1280.0f, 720.0f};
-    int m_spawnCounter = 0;
+    SceneHierarchyPanel m_hierarchyPanel;
+    InspectorPanel m_inspectorPanel;
+    ViewportPanel m_viewportPanel;
+    ContentBrowserPanel m_contentBrowserPanel;
+    ConsolePanel m_consolePanel;
 };
 
 }  // namespace molly

@@ -1,21 +1,17 @@
 #include "EditorLayer.h"
 
-#include <string>
-
-#include <glad/gl.h>
 #include <imgui.h>
-
-#include <GLFW/glfw3.h>
 
 namespace molly {
 
 EditorLayer::EditorLayer() : Layer("EditorLayer") {}
 
 void EditorLayer::onAttach() {
-    glEnable(GL_DEPTH_TEST);
+    m_editScene = std::make_unique<Scene>();
+    buildDefaultScene();
+}
 
-    // The editor is the primary place hot reload earns its keep — tweak a
-    // shader on disk, see it update in the Viewport without restarting.
+void EditorLayer::buildDefaultScene() {
     auto& resources = Application::get().getResourceManager();
     resources.setHotReloadEnabled(true);
 
@@ -33,172 +29,123 @@ void EditorLayer::onAttach() {
     auto boxMeshes = resources.loadModel("assets/models/box/Box.gltf");
     std::shared_ptr<Mesh> boxMesh = boxMeshes.empty() ? Mesh::createCube() : boxMeshes[0];
 
-    Entity floor = m_scene.createEntity("Floor");
+    Entity floor = m_editScene->createEntity("Floor");
     floor.getComponent<TransformComponent>().position = {0.0f, -0.6f, 0.0f};
     auto& floorRenderer = floor.addComponent<MeshRendererComponent>();
     floorRenderer.mesh = Mesh::createPlane(10.0f);
     floorRenderer.material = floorMaterial;
+    floor.addComponent<RigidBodyComponent>().type = BodyType::Static;
+    auto& floorCollider = floor.addComponent<ColliderComponent>();
+    floorCollider.shape = ColliderShape::Box;
+    floorCollider.halfExtents = {5.0f, 0.1f, 5.0f};
 
-    Entity prop = m_scene.createEntity("Prop");
+    Entity prop = m_editScene->createEntity("Prop");
     auto& propRenderer = prop.addComponent<MeshRendererComponent>();
     propRenderer.mesh = boxMesh;
     propRenderer.material = m_material;
 
-    Entity light = m_scene.createEntity("Sun");
+    Entity light = m_editScene->createEntity("Sun");
     light.getComponent<TransformComponent>().rotation = {-45.0f, 45.0f, 0.0f};
     auto& lightComp = light.addComponent<LightComponent>();
     lightComp.type = LightType::Directional;
     lightComp.color = {1.0f, 0.96f, 0.9f};
     lightComp.intensity = 1.1f;
 
-    m_editorCamera = PerspectiveCamera(60.0f, m_viewportSize.x / m_viewportSize.y, 0.1f, 100.0f);
-    m_editorCamera.setPosition({2.5f, 2.5f, 2.5f});
-    m_editorCamera.setPitchYaw(-35.0f, -135.0f);
-
-    FramebufferSpec spec;
-    spec.width = static_cast<uint32_t>(m_viewportSize.x);
-    spec.height = static_cast<uint32_t>(m_viewportSize.y);
-    m_framebuffer = std::make_shared<Framebuffer>(spec);
+    Entity camera = m_editScene->createEntity("MainCamera");
+    auto& cameraComp = camera.addComponent<CameraComponent>();
+    cameraComp.camera = PerspectiveCamera(55.0f, 16.0f / 9.0f, 0.1f, 100.0f);
+    cameraComp.camera.setPosition({0.0f, 3.0f, 5.0f});
+    cameraComp.camera.setPitchYaw(-25.0f, -90.0f);
+    cameraComp.primary = true;
 }
 
-void EditorLayer::updateEditorCamera(float dt) {
-    auto* window = Application::get().getWindow().getNativeWindow();
-    static bool firstMove = true;
+Scene* EditorLayer::activeScene() {
+    return m_playState == EditorPlayState::Edit ? m_editScene.get() : m_runtimeScene.get();
+}
 
-    if (!m_viewportFocused || glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) != GLFW_PRESS) {
-        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-        firstMove = true;
-        return;
-    }
+void EditorLayer::onPlay() {
+    m_runtimeScene = m_editScene->clone();
+    m_playState = EditorPlayState::Playing;
+    m_hierarchyPanel.setSelected({});
+}
 
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+void EditorLayer::onStop() {
+    m_runtimeScene.reset();
+    m_playState = EditorPlayState::Edit;
+    m_hierarchyPanel.setSelected({});
+}
 
-    static double lastX = 0.0, lastY = 0.0;
-    double x, y;
-    glfwGetCursorPos(window, &x, &y);
-    if (firstMove) {
-        lastX = x;
-        lastY = y;
-        firstMove = false;
-    }
-    float dx = static_cast<float>(x - lastX);
-    float dy = static_cast<float>(y - lastY);
-    lastX = x;
-    lastY = y;
-
-    constexpr float sensitivity = 0.15f;
-    m_editorCamera.setPitchYaw(m_editorCamera.getPitch() - dy * sensitivity,
-                                m_editorCamera.getYaw() + dx * sensitivity);
-
-    float speed = 3.0f * dt;
-    glm::vec3 pos = m_editorCamera.getPosition();
-    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) pos += m_editorCamera.getForward() * speed;
-    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) pos -= m_editorCamera.getForward() * speed;
-    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) pos -= m_editorCamera.getRight() * speed;
-    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) pos += m_editorCamera.getRight() * speed;
-    if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS) pos += glm::vec3(0.0f, 1.0f, 0.0f) * speed;
-    if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS) pos -= glm::vec3(0.0f, 1.0f, 0.0f) * speed;
-    m_editorCamera.setPosition(pos);
+void EditorLayer::onPause() {
+    m_playState =
+        m_playState == EditorPlayState::Playing ? EditorPlayState::Paused : EditorPlayState::Playing;
 }
 
 void EditorLayer::onUpdate(float dt) {
-    // Simulation only — no rendering here. The framebuffer's size is only
-    // known once the Viewport panel lays out during onImGuiRender, so the
-    // scene is rendered from renderViewport() (called from onImGuiRender),
-    // right after resizing the framebuffer and before displaying it. Doing
-    // the render here would draw at last frame's size, and any resize that
-    // happens afterward would display a freshly-allocated, never-rendered
-    // texture (undefined GPU memory contents) for one frame — this was the
-    // cause of the ghosting/glitching seen while resizing or redocking
-    // panels: it repeated every single frame during a drag.
-    updateEditorCamera(dt);
-    m_scene.onUpdate(dt);
+    if (m_playState == EditorPlayState::Edit) {
+        // No physics/scripts in edit mode (PLAN.md §18.4) — only the fly
+        // camera moves; the scene itself is static until Play is pressed.
+        m_viewportPanel.onUpdate(dt);
+    } else if (m_playState == EditorPlayState::Playing) {
+        m_runtimeScene->onUpdate(dt);
+    }
+    // Paused: no onUpdate for the runtime scene, viewport still redraws the frozen frame.
 }
 
-void EditorLayer::renderViewport() {
-    ImVec2 size = ImGui::GetContentRegionAvail();
-    if (size.x > 0 && size.y > 0 &&
-        (static_cast<uint32_t>(size.x) != m_framebuffer->getSpec().width ||
-         static_cast<uint32_t>(size.y) != m_framebuffer->getSpec().height)) {
-        m_framebuffer->resize(static_cast<uint32_t>(size.x), static_cast<uint32_t>(size.y));
-        m_viewportSize = {size.x, size.y};
-        m_editorCamera.setAspectRatio(size.x / size.y);
-    }
+void EditorLayer::drawToolbar() {
+    ImGui::Begin("Toolbar", nullptr, ImGuiWindowFlags_NoScrollbar);
 
-    m_framebuffer->bind();
-    glClearColor(0.10f, 0.10f, 0.12f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    renderScene(m_scene.getRegistry(), m_editorCamera.getViewProjectionMatrix(),
-                m_editorCamera.getPosition());
-
-    m_framebuffer->unbind();
-
-    ImGui::Image(static_cast<ImTextureID>(static_cast<intptr_t>(m_framebuffer->getColorAttachmentRendererId())),
-                 size, ImVec2(0, 1), ImVec2(1, 0));
-}
-
-void EditorLayer::drawHierarchyPanel() {
-    ImGui::Begin("Hierarchy");
-
-    if (ImGui::Button("Create Entity")) {
-        ++m_spawnCounter;
-        Entity entity = m_scene.createEntity("Entity" + std::to_string(m_spawnCounter));
-        auto& renderer = entity.addComponent<MeshRendererComponent>();
-        renderer.mesh = Mesh::createCube(0.5f);
-        renderer.material = m_material;
-        m_selected = entity;
-    }
-
-    ImGui::Separator();
-
-    for (auto entity : m_scene.getRegistry().view<TagComponent>()) {
-        auto& tag = m_scene.getRegistry().get<TagComponent>(entity);
-        bool isSelected = m_selected == Entity(entity, &m_scene);
-        if (ImGui::Selectable(tag.name.c_str(), isSelected)) {
-            m_selected = Entity(entity, &m_scene);
-        }
-    }
-    ImGui::End();
-
-    ImGui::Begin("Inspector");
-    if (m_selected) {
-        auto& tag = m_selected.getComponent<TagComponent>();
-        ImGui::Text("%s", tag.name.c_str());
-
-        auto& transform = m_selected.getComponent<TransformComponent>();
-        ImGui::DragFloat3("Position", &transform.position.x, 0.1f);
-        ImGui::DragFloat3("Rotation", &transform.rotation.x, 1.0f);
-        ImGui::DragFloat3("Scale", &transform.scale.x, 0.1f);
-
-        if (ImGui::Button("Delete Entity")) {
-            m_scene.destroyEntity(m_selected);
-            m_selected = {};
-        }
+    bool playing = m_playState != EditorPlayState::Edit;
+    if (!playing) {
+        if (ImGui::Button("Play")) onPlay();
     } else {
-        ImGui::TextDisabled("No entity selected");
+        if (ImGui::Button("Stop")) onStop();
+        ImGui::SameLine();
+        const char* pauseLabel = m_playState == EditorPlayState::Paused ? "Resume" : "Pause";
+        if (ImGui::Button(pauseLabel)) onPause();
     }
+
+    ImGui::SameLine();
+    const char* stateLabel = m_playState == EditorPlayState::Edit     ? "Edit"
+                              : m_playState == EditorPlayState::Playing ? "Playing"
+                                                                        : "Paused";
+    ImGui::TextDisabled("(%s)", stateLabel);
+
     ImGui::End();
 }
 
 void EditorLayer::onImGuiRender() {
-    ImGui::Begin("Molly Editor - Milestone 3");
-    ImGui::Text("ECS: entities/components drive the scene (entt).");
+    // Turns the main window into a dockspace host so panels can be freely
+    // docked/rearranged (PLAN.md §18.2). A pre-arranged first-launch layout
+    // via ImGui's DockBuilder API is listed there as a nice-to-have; left
+    // as a follow-up since getting it right needs visual iteration this
+    // session can't do — panels currently start floating and the user
+    // docks them once, which ImGui then remembers via imgui.ini.
+    ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode);
+
+    drawToolbar();
+
+    ImGui::Begin("Molly Editor - Milestone 7");
+    ImGui::Text("Editor shell: Hierarchy, Inspector, Content Browser, Console, Play/Pause/Stop.");
     ImGui::Text("Frame time: %.3f ms (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate,
                 ImGui::GetIO().Framerate);
-    ImGui::Text("Hold Right Mouse in the Viewport to fly: WASD + QE, mouse-look.");
+    ImGui::Text("Hold Right Mouse in the Viewport to fly: WASD + QE, mouse-look (edit mode only).");
     ImGui::End();
 
-    drawHierarchyPanel();
+    Scene* scene = activeScene();
+    m_hierarchyPanel.setContext(scene);
+    m_hierarchyPanel.onImGuiRender();
+    m_inspectorPanel.onImGuiRender(scene, m_hierarchyPanel.getSelected());
+    m_contentBrowserPanel.onImGuiRender();
+    m_consolePanel.onImGuiRender();
 
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-    ImGui::Begin("Viewport");
-    m_viewportFocused = ImGui::IsWindowFocused() || ImGui::IsWindowHovered();
-
-    renderViewport();
-
-    ImGui::End();
-    ImGui::PopStyleVar();
+    PerspectiveCamera* overrideCamera = nullptr;
+    if (m_playState != EditorPlayState::Edit && scene) {
+        entt::entity camEntity = findPrimaryCamera(scene->getRegistry());
+        if (camEntity != entt::null) {
+            overrideCamera = &scene->getRegistry().get<CameraComponent>(camEntity).camera;
+        }
+    }
+    m_viewportPanel.onImGuiRender(scene, overrideCamera);
 }
 
 }  // namespace molly
