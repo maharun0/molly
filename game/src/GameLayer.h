@@ -1,7 +1,6 @@
 #pragma once
 
 #include <memory>
-#include <vector>
 
 #include <molly/Molly.h>
 
@@ -16,11 +15,12 @@ public:
     void onImGuiRender() override;
 
 private:
+    Scene m_scene;
+    Entity m_propEntity;
+    Entity m_cameraEntity;
     std::shared_ptr<Material> m_material;
-    std::vector<std::shared_ptr<Mesh>> m_meshes;
-    PerspectiveCamera m_camera;
-    Light m_dirLight;
     float m_time = 0.0f;
+    int m_spawnCounter = 0;
 };
 
 }  // namespace molly

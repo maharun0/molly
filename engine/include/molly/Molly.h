@@ -15,6 +15,12 @@
 #include "molly/core/Events/MouseEvent.h"
 #include "molly/core/Events/WindowEvent.h"
 
+#include "molly/ecs/Components.h"
+#include "molly/ecs/Entity.h"
+#include "molly/ecs/Scene.h"
+#include "molly/ecs/Systems/CameraSystem.h"
+#include "molly/ecs/Systems/RenderSystem.h"
+
 #include "molly/renderer/Buffer.h"
 #include "molly/renderer/Camera.h"
 #include "molly/renderer/Framebuffer.h"

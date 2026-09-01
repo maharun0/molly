@@ -1,7 +1,6 @@
 #pragma once
 
 #include <memory>
-#include <vector>
 
 #include <molly/Molly.h>
 
@@ -16,18 +15,19 @@ public:
     void onImGuiRender() override;
 
 private:
-    void renderScene();
     void updateEditorCamera(float dt);
+    void drawHierarchyPanel();
 
+    Scene m_scene;
+    Entity m_selected;
     std::shared_ptr<Material> m_material;
-    std::vector<std::shared_ptr<Mesh>> m_meshes;
     std::shared_ptr<Framebuffer> m_framebuffer;
 
-    PerspectiveCamera m_camera;
-    Light m_dirLight;
+    PerspectiveCamera m_editorCamera;
 
     bool m_viewportFocused = false;
     glm::vec2 m_viewportSize{1280.0f, 720.0f};
+    int m_spawnCounter = 0;
 };
 
 }  // namespace molly
