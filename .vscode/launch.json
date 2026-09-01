@@ -1,0 +1,21 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Launch molly-editor",
+      "type": "cppvsdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/windows-debug/bin/editor/Debug/molly-editor.exe",
+      "cwd": "${workspaceFolder}/editor",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Launch molly-demo",
+      "type": "cppvsdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/windows-debug/bin/game/Debug/molly-demo.exe",
+      "cwd": "${workspaceFolder}/game",
+      "console": "integratedTerminal"
+    }
+  ]
+}

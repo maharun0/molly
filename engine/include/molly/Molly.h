@@ -16,5 +16,13 @@
 #include "molly/core/Events/WindowEvent.h"
 
 #include "molly/renderer/Buffer.h"
+#include "molly/renderer/Camera.h"
+#include "molly/renderer/Framebuffer.h"
+#include "molly/renderer/Light.h"
+#include "molly/renderer/Material.h"
+#include "molly/renderer/Mesh.h"
 #include "molly/renderer/Shader.h"
+#include "molly/renderer/Texture.h"
 #include "molly/renderer/VertexArray.h"
+
+#include "molly/resource/ModelLoader.h"

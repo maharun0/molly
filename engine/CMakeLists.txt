@@ -12,6 +12,8 @@ target_link_libraries(molly-engine
         entt
         molly-imgui
         spdlog::spdlog
+        stb
+        assimp::assimp
     PRIVATE
         molly_warnings
         molly_sanitizers

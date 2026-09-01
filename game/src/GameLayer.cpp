@@ -5,72 +5,66 @@
 
 namespace molly {
 
-static const char* s_vertexSrc = R"(
-    #version 460 core
-    layout(location = 0) in vec3 a_Position;
-    layout(location = 1) in vec3 a_Color;
-
-    out vec3 v_Color;
-
-    void main() {
-        v_Color = a_Color;
-        gl_Position = vec4(a_Position, 1.0);
-    }
-)";
-
-static const char* s_fragmentSrc = R"(
-    #version 460 core
-    in vec3 v_Color;
-    out vec4 o_Color;
-
-    void main() {
-        o_Color = vec4(v_Color, 1.0);
-    }
-)";
-
 GameLayer::GameLayer() : Layer("GameLayer") {}
 
 void GameLayer::onAttach() {
-    m_shader = std::make_shared<Shader>(s_vertexSrc, s_fragmentSrc);
+    glEnable(GL_DEPTH_TEST);
 
-    float vertices[] = {
-        -0.5f, -0.5f, 0.0f, 0.9f, 0.6f, 0.1f,
-         0.5f, -0.5f, 0.0f, 0.1f, 0.6f, 0.9f,
-         0.0f,  0.5f, 0.0f, 0.6f, 0.9f, 0.1f,
-    };
-    uint32_t indices[] = {0, 1, 2};
+    auto shader = Shader::createFromFiles("assets/shaders/lit.vert", "assets/shaders/lit.frag");
+    m_material = std::make_shared<Material>();
+    m_material->shader = shader;
+    m_material->albedoColor = {0.85f, 0.65f, 0.35f};
 
-    auto vb = std::make_shared<VertexBuffer>(vertices, static_cast<uint32_t>(sizeof(vertices)));
-    vb->setLayout({
-        {ShaderDataType::Float3, "a_Position"},
-        {ShaderDataType::Float3, "a_Color"},
-    });
+    m_meshes = ModelLoader::load("assets/models/box/Box.gltf");
+    if (m_meshes.empty()) {
+        MOLLY_WARN("No meshes loaded for the Milestone 2 test model; falling back to a procedural cube");
+        m_meshes.push_back(Mesh::createCube());
+    }
 
-    auto ib = std::make_shared<IndexBuffer>(indices, 3);
+    m_dirLight.type = LightType::Directional;
+    m_dirLight.direction = glm::normalize(glm::vec3(-0.4f, -0.9f, -0.3f));
+    m_dirLight.color = {1.0f, 0.96f, 0.9f};
+    m_dirLight.intensity = 1.1f;
 
-    m_vertexArray = std::make_shared<VertexArray>();
-    m_vertexArray->addVertexBuffer(vb);
-    m_vertexArray->setIndexBuffer(ib);
+    auto& window = Application::get().getWindow();
+    float aspect = static_cast<float>(window.getWidth()) / static_cast<float>(window.getHeight());
+    m_camera = PerspectiveCamera(50.0f, aspect, 0.1f, 100.0f);
+    m_camera.setPosition({0.0f, 2.2f, 3.0f});
+    m_camera.setPitchYaw(-45.0f, -90.0f);
 }
 
-void GameLayer::onUpdate(float /*dt*/) {
+void GameLayer::onUpdate(float dt) {
+    m_time += dt;
+
     glClearColor(0.05f, 0.05f, 0.08f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    m_shader->bind();
-    m_vertexArray->bind();
-    glDrawElements(GL_TRIANGLES, static_cast<int>(m_vertexArray->getIndexBuffer()->getCount()),
-                   GL_UNSIGNED_INT, nullptr);
+    m_material->bind();
+    m_material->shader->setMat4("u_ViewProjection", m_camera.getViewProjectionMatrix());
+    m_material->shader->setFloat3("u_ViewPos", m_camera.getPosition());
+
+    glm::mat4 model = glm::rotate(glm::mat4(1.0f), m_time * 0.6f, glm::vec3(0.0f, 1.0f, 0.0f));
+    m_material->shader->setMat4("u_Model", model);
+    m_material->shader->setMat3("u_NormalMatrix", glm::transpose(glm::inverse(glm::mat3(model))));
+
+    m_material->shader->setFloat3("u_DirLight.direction", m_dirLight.direction);
+    m_material->shader->setFloat3("u_DirLight.color", m_dirLight.color);
+    m_material->shader->setFloat("u_DirLight.intensity", m_dirLight.intensity);
+    m_material->shader->setInt("u_PointLightCount", 0);
+
+    for (const auto& mesh : m_meshes) {
+        mesh->bind();
+        glDrawElements(GL_TRIANGLES, static_cast<int>(mesh->getIndexCount()), GL_UNSIGNED_INT,
+                       nullptr);
+    }
 }
 
 void GameLayer::onImGuiRender() {
-    ImGui::Begin("Molly Demo - Milestone 1");
-    ImGui::Text("Bootstrap: window + OpenGL + ImGui, all working.");
+    ImGui::Begin("Molly Demo - Milestone 2");
+    ImGui::Text("Renderer core: textured/lit model loaded via Assimp, perspective camera.");
     ImGui::Text("Frame time: %.3f ms (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate,
                 ImGui::GetIO().Framerate);
     ImGui::End();
-
-    ImGui::ShowDemoWindow();
 }
 
 }  // namespace molly

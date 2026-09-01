@@ -29,6 +29,21 @@ add_library(molly-imgui STATIC
 target_include_directories(molly-imgui PUBLIC imgui imgui/backends)
 target_link_libraries(molly-imgui PUBLIC glfw glad)
 
+# --- stb_image (header-only) --------------------------------------------
+add_library(stb INTERFACE)
+target_include_directories(stb INTERFACE stb)
+
+# --- Assimp (importer list trimmed to what the demo game needs) ---------
+set(ASSIMP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(ASSIMP_BUILD_ASSIMP_TOOLS OFF CACHE BOOL "" FORCE)
+set(ASSIMP_INSTALL OFF CACHE BOOL "" FORCE)
+set(ASSIMP_NO_EXPORT ON CACHE BOOL "" FORCE)
+set(ASSIMP_BUILD_ALL_IMPORTERS_BY_DEFAULT OFF CACHE BOOL "" FORCE)
+set(ASSIMP_BUILD_GLTF_IMPORTER ON CACHE BOOL "" FORCE)
+set(ASSIMP_BUILD_OBJ_IMPORTER ON CACHE BOOL "" FORCE)
+set(ASSIMP_BUILD_FBX_IMPORTER ON CACHE BOOL "" FORCE)
+add_subdirectory(assimp)
+
 # --- spdlog -----------------------------------------------------------------
 set(SPDLOG_BUILD_EXAMPLE OFF CACHE BOOL "" FORCE)
 set(SPDLOG_BUILD_TESTS OFF CACHE BOOL "" FORCE)
