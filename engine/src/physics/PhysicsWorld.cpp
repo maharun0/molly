@@ -55,13 +55,11 @@ void PhysicsWorld::init() {
                    m_broadPhaseLayerInterface, m_objectVsBroadPhaseLayerFilter,
                    m_objectLayerPairFilter);
 
+    // Trigger callbacks are wired up by Scene (which owns both this
+    // PhysicsWorld and the ScriptEngine they need to be connected to) —
+    // see Scene::Scene().
     m_contactListener = std::make_unique<MollyContactListener>();
-    m_contactListener->setTriggerEnterCallback([](JPH::BodyID a, JPH::BodyID b) {
-        MOLLY_INFO("Trigger enter: body {0} <-> body {1}", a.GetIndex(), b.GetIndex());
-    });
-    m_contactListener->setTriggerExitCallback([](JPH::BodyID a, JPH::BodyID b) {
-        MOLLY_INFO("Trigger exit: body {0} <-> body {1}", a.GetIndex(), b.GetIndex());
-    });
+    m_contactListener->setPhysicsSystem(m_system.get());
     m_system->SetContactListener(m_contactListener.get());
 
     MOLLY_INFO("PhysicsWorld initialized ({0} worker threads)", numThreads);

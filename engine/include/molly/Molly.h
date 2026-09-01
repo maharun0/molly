@@ -28,6 +28,9 @@
 #include "molly/physics/PhysicsComponents.h"
 #include "molly/physics/PhysicsWorld.h"
 
+#include "molly/scripting/ScriptComponent.h"
+#include "molly/scripting/ScriptEngine.h"
+
 #include "molly/renderer/Buffer.h"
 #include "molly/renderer/Camera.h"
 #include "molly/renderer/Framebuffer.h"

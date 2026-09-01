@@ -31,6 +31,7 @@ public:
 
     JPH::PhysicsSystem& getSystem() { return *m_system; }
     JPH::BodyInterface& getBodyInterface() { return m_system->GetBodyInterface(); }
+    MollyContactListener& getContactListener() { return *m_contactListener; }
 
 private:
     std::unique_ptr<JPH::PhysicsSystem> m_system;

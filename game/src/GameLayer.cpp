@@ -5,8 +5,6 @@
 #include <glad/gl.h>
 #include <imgui.h>
 
-#include <GLFW/glfw3.h>
-
 namespace molly {
 
 GameLayer::GameLayer() : Layer("GameLayer") {}
@@ -79,6 +77,7 @@ void GameLayer::onAttach() {
     triggerCollider.shape = ColliderShape::Box;
     triggerCollider.halfExtents = {1.0f, 0.5f, 1.0f};
     triggerCollider.isTrigger = true;
+    trigger.addComponent<ScriptComponent>().scriptPath = "assets/scripts/trigger_zone.lua";
 
     // Rotating prop (unrelated to physics — kept from Milestone 3 as a visual anchor).
     m_propEntity = m_scene.createEntity("Prop");
@@ -98,6 +97,7 @@ void GameLayer::onAttach() {
     playerController.speed = 3.5f;
     playerController.radius = 0.3f;
     playerController.height = 1.8f;
+    m_playerEntity.addComponent<ScriptComponent>().scriptPath = "assets/scripts/player.lua";
 
     // Directional light
     Entity light = m_scene.createEntity("Sun");
@@ -118,22 +118,8 @@ void GameLayer::onAttach() {
     cameraComp.primary = true;
 }
 
-void GameLayer::handlePlayerInput(float /*dt*/) {
-    auto* window = Application::get().getWindow().getNativeWindow();
-
-    glm::vec2 direction{0.0f};
-    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) direction.y -= 1.0f;
-    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) direction.y += 1.0f;
-    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) direction.x -= 1.0f;
-    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) direction.x += 1.0f;
-
-    auto& controller = m_playerEntity.getComponent<CharacterControllerComponent>();
-    moveCharacter(m_scene.getRegistry(), m_playerEntity, direction, controller.speed);
-}
-
 void GameLayer::onUpdate(float dt) {
     m_time += dt;
-    handlePlayerInput(dt);
 
     auto& transform = m_propEntity.getComponent<TransformComponent>();
     transform.rotation.y = m_time * 35.0f;
@@ -146,12 +132,13 @@ void GameLayer::onUpdate(float dt) {
 }
 
 void GameLayer::onImGuiRender() {
-    ImGui::Begin("Molly Demo - Milestone 4");
-    ImGui::Text("Physics: Jolt rigid bodies, character controller, trigger volumes.");
+    ImGui::Begin("Molly Demo - Milestone 5");
+    ImGui::Text("Scripting: player movement + trigger callbacks are Lua, not C++.");
     ImGui::Text("Frame time: %.3f ms (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate,
                 ImGui::GetIO().Framerate);
-    ImGui::Text("WASD to move the blue player capsule. Walk through the yellow");
-    ImGui::Text("trigger zone and watch the log for enter/exit messages.");
+    ImGui::Text("WASD (handled in assets/scripts/player.lua) to move the blue capsule.");
+    ImGui::Text("Walk through the yellow trigger zone and watch the log for enter/exit");
+    ImGui::Text("messages (assets/scripts/trigger_zone.lua).");
 
     if (ImGui::Button("Spawn Cube")) {
         ++m_spawnCounter;

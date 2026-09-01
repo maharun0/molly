@@ -5,6 +5,7 @@
 #include <entt/entt.hpp>
 
 #include "molly/physics/PhysicsWorld.h"
+#include "molly/scripting/ScriptEngine.h"
 
 namespace molly {
 
@@ -24,19 +25,20 @@ public:
 
     Entity findEntityByName(const std::string& name);
 
-    // Steps physics (fixed-timestep accumulator) and character controllers.
-    // Milestone 4 scope: no scripting yet (Milestone 5) and no separate
-    // edit/play mode split yet (Milestone 7) — this is the de facto
-    // "runtime" update for now.
+    // Steps physics (fixed-timestep accumulator), character controllers,
+    // and scripts. No separate edit/play mode split yet (Milestone 7) —
+    // this is the de facto "runtime" update for now.
     void onUpdate(float dt);
     void onRender();
 
     entt::registry& getRegistry() { return m_registry; }
     PhysicsWorld& getPhysicsWorld() { return m_physicsWorld; }
+    ScriptEngine& getScriptEngine() { return m_scriptEngine; }
 
 private:
     entt::registry m_registry;
     PhysicsWorld m_physicsWorld;
+    ScriptEngine m_scriptEngine;
     float m_physicsAccumulator = 0.0f;
     friend class Entity;
 };

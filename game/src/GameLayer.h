@@ -15,8 +15,6 @@ public:
     void onImGuiRender() override;
 
 private:
-    void handlePlayerInput(float dt);
-
     Scene m_scene;
     Entity m_propEntity;
     Entity m_cameraEntity;

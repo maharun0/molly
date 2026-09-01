@@ -72,6 +72,7 @@ static void syncPhysicsBodies(entt::registry& registry, PhysicsWorld& physicsWor
                                             motionTypeFor(rb.type), objectLayerFor(rb.type));
         settings.mFriction = collider.friction;
         settings.mRestitution = collider.restitution;
+        settings.mUserData = static_cast<JPH::uint64>(entt::to_integral(entity));
         if (rb.type == BodyType::Dynamic) {
             settings.mOverrideMassProperties = JPH::EOverrideMassProperties::CalculateInertia;
             settings.mMassPropertiesOverride.mMass = rb.mass;

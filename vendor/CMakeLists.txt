@@ -45,6 +45,23 @@ set(ENABLE_ALL_WARNINGS OFF CACHE BOOL "" FORCE)
 set(USE_STATIC_MSVC_RUNTIME_LIBRARY OFF CACHE BOOL "" FORCE)
 add_subdirectory(JoltPhysics/Build)
 
+# --- Lua (hand-rolled C library target; official source has no CMake) ---
+file(GLOB LUA_SOURCES lua/*.c)
+list(REMOVE_ITEM LUA_SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/lua/lua.c      # standalone interpreter's main(), not needed as a library
+    ${CMAKE_CURRENT_SOURCE_DIR}/lua/onelua.c   # alternate amalgamated single-TU build; would duplicate symbols
+    ${CMAKE_CURRENT_SOURCE_DIR}/lua/ltests.c   # internal test harness, inert unless LUA_USER_H defines it on
+)
+add_library(molly-lua STATIC ${LUA_SOURCES})
+target_include_directories(molly-lua PUBLIC lua)
+set_source_files_properties(${LUA_SOURCES} PROPERTIES LANGUAGE C)
+
+# --- sol2 (header-only; wired directly rather than via its own CMake, ----
+# which tries to find/link a system Lua we don't want it searching for)
+add_library(sol2 INTERFACE)
+target_include_directories(sol2 INTERFACE sol2/include)
+target_link_libraries(sol2 INTERFACE molly-lua)
+
 # --- Assimp (importer list trimmed to what the demo game needs) ---------
 set(ASSIMP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(ASSIMP_BUILD_ASSIMP_TOOLS OFF CACHE BOOL "" FORCE)
