@@ -5,6 +5,9 @@ out/
 # Logs
 logs/
 
+# Test scratch output (tests/scene/SceneSerializerTests.cpp round-trip files)
+test_scratch/
+
 # ImGui runtime layout state (written next to the running exe's cwd)
 imgui.ini
 

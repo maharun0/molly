@@ -24,6 +24,7 @@ public:
 
 private:
     void buildDefaultScene();
+    void drawMenuBar();
     void drawToolbar();
     Scene* activeScene();
 
@@ -31,11 +32,18 @@ private:
     void onStop();
     void onPause();
 
+    void newScene();
+    void saveScene();
+    void openScene();
+    void createPrefabFromSelection();
+
     std::unique_ptr<Scene> m_editScene;
     std::unique_ptr<Scene> m_runtimeScene;
     EditorPlayState m_playState = EditorPlayState::Edit;
 
     std::shared_ptr<Material> m_material;
+    char m_scenePathBuffer[256] = "assets/scenes/main.scene.json";
+    char m_prefabPathBuffer[256] = "assets/prefabs/new_prefab.prefab.json";
 
     SceneHierarchyPanel m_hierarchyPanel;
     InspectorPanel m_inspectorPanel;

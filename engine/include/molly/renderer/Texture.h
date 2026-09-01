@@ -25,6 +25,7 @@ public:
     // hot reload); no-op for the blank/framebuffer constructor.
     bool reload();
 
+    const std::string& getPath() const { return m_path; }
     uint32_t getWidth() const { return m_width; }
     uint32_t getHeight() const { return m_height; }
     uint32_t getRendererId() const { return m_rendererId; }

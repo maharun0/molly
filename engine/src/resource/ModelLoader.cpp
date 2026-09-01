@@ -53,7 +53,9 @@ std::vector<std::shared_ptr<Mesh>> ModelLoader::load(const std::string& path) {
     }
 
     for (unsigned int i = 0; i < scene->mNumMeshes; ++i) {
-        meshes.push_back(processMesh(scene->mMeshes[i]));
+        auto mesh = processMesh(scene->mMeshes[i]);
+        mesh->setDescriptor({MeshSource::Model, path, static_cast<int>(i), 1.0f});
+        meshes.push_back(mesh);
     }
 
     MOLLY_INFO("Loaded model \"{0}\" ({1} mesh(es))", path, meshes.size());

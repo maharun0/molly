@@ -1,5 +1,7 @@
 #include "EditorLayer.h"
 
+#include <filesystem>
+
 #include <imgui.h>
 
 namespace molly {
@@ -80,6 +82,38 @@ void EditorLayer::onPause() {
         m_playState == EditorPlayState::Playing ? EditorPlayState::Paused : EditorPlayState::Playing;
 }
 
+void EditorLayer::newScene() {
+    if (m_playState != EditorPlayState::Edit) onStop();
+    m_editScene = std::make_unique<Scene>();
+    m_hierarchyPanel.setSelected({});
+}
+
+void EditorLayer::saveScene() {
+    std::filesystem::path path(m_scenePathBuffer);
+    std::error_code ec;
+    if (path.has_parent_path()) std::filesystem::create_directories(path.parent_path(), ec);
+    SceneSerializer::serialize(*m_editScene, m_scenePathBuffer);
+}
+
+void EditorLayer::openScene() {
+    auto loaded = std::make_unique<Scene>();
+    if (!SceneSerializer::deserialize(m_scenePathBuffer, *loaded)) return;
+
+    if (m_playState != EditorPlayState::Edit) onStop();
+    m_editScene = std::move(loaded);
+    m_hierarchyPanel.setSelected({});
+}
+
+void EditorLayer::createPrefabFromSelection() {
+    Entity selected = m_hierarchyPanel.getSelected();
+    if (!selected) return;
+
+    std::filesystem::path path(m_prefabPathBuffer);
+    std::error_code ec;
+    if (path.has_parent_path()) std::filesystem::create_directories(path.parent_path(), ec);
+    SceneSerializer::serializePrefab(selected, m_prefabPathBuffer);
+}
+
 void EditorLayer::onUpdate(float dt) {
     if (m_playState == EditorPlayState::Edit) {
         // No physics/scripts in edit mode (PLAN.md §18.4) — only the fly
@@ -89,6 +123,19 @@ void EditorLayer::onUpdate(float dt) {
         m_runtimeScene->onUpdate(dt);
     }
     // Paused: no onUpdate for the runtime scene, viewport still redraws the frozen frame.
+}
+
+void EditorLayer::drawMenuBar() {
+    if (!ImGui::BeginMainMenuBar()) return;
+
+    if (ImGui::BeginMenu("File")) {
+        if (ImGui::MenuItem("New Scene")) newScene();
+        if (ImGui::MenuItem("Save Scene")) saveScene();
+        if (ImGui::MenuItem("Open Scene")) openScene();
+        ImGui::EndMenu();
+    }
+
+    ImGui::EndMainMenuBar();
 }
 
 void EditorLayer::drawToolbar() {
@@ -110,6 +157,18 @@ void EditorLayer::drawToolbar() {
                                                                         : "Paused";
     ImGui::TextDisabled("(%s)", stateLabel);
 
+    ImGui::Separator();
+    ImGui::SetNextItemWidth(320.0f);
+    ImGui::InputText("Scene Path", m_scenePathBuffer, sizeof(m_scenePathBuffer));
+
+    ImGui::SetNextItemWidth(320.0f);
+    ImGui::InputText("Prefab Path", m_prefabPathBuffer, sizeof(m_prefabPathBuffer));
+    ImGui::SameLine();
+    bool hasSelection = static_cast<bool>(m_hierarchyPanel.getSelected());
+    ImGui::BeginDisabled(!hasSelection);
+    if (ImGui::Button("Create Prefab From Selection")) createPrefabFromSelection();
+    ImGui::EndDisabled();
+
     ImGui::End();
 }
 
@@ -122,10 +181,11 @@ void EditorLayer::onImGuiRender() {
     // docks them once, which ImGui then remembers via imgui.ini.
     ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode);
 
+    drawMenuBar();
     drawToolbar();
 
-    ImGui::Begin("Molly Editor - Milestone 7");
-    ImGui::Text("Editor shell: Hierarchy, Inspector, Content Browser, Console, Play/Pause/Stop.");
+    ImGui::Begin("Molly Editor - Milestone 8");
+    ImGui::Text("Scene serialization: File > Save/Open Scene, Create Prefab From Selection.");
     ImGui::Text("Frame time: %.3f ms (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate,
                 ImGui::GetIO().Framerate);
     ImGui::Text("Hold Right Mouse in the Viewport to fly: WASD + QE, mouse-look (edit mode only).");

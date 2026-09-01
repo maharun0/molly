@@ -28,6 +28,8 @@
 #include "molly/physics/PhysicsComponents.h"
 #include "molly/physics/PhysicsWorld.h"
 
+#include "molly/scene/SceneSerializer.h"
+
 #include "molly/scripting/ScriptComponent.h"
 #include "molly/scripting/ScriptEngine.h"
 

@@ -62,6 +62,10 @@ add_library(sol2 INTERFACE)
 target_include_directories(sol2 INTERFACE sol2/include)
 target_link_libraries(sol2 INTERFACE molly-lua)
 
+# --- nlohmann/json (header-only) -----------------------------------------
+add_library(json INTERFACE)
+target_include_directories(json INTERFACE json/single_include)
+
 # --- Assimp (importer list trimmed to what the demo game needs) ---------
 set(ASSIMP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(ASSIMP_BUILD_ASSIMP_TOOLS OFF CACHE BOOL "" FORCE)
@@ -72,6 +76,16 @@ set(ASSIMP_BUILD_GLTF_IMPORTER ON CACHE BOOL "" FORCE)
 set(ASSIMP_BUILD_OBJ_IMPORTER ON CACHE BOOL "" FORCE)
 set(ASSIMP_BUILD_FBX_IMPORTER ON CACHE BOOL "" FORCE)
 add_subdirectory(assimp)
+
+# --- Catch2 (test framework) -----------------------------------------------
+if (MOLLY_BUILD_TESTS)
+    add_subdirectory(catch2)
+    # Catch2's own CMakeLists exports its extras/ dir (Catch.cmake, needed by
+    # tests/CMakeLists.txt's `include(Catch)`) to CMAKE_MODULE_PATH via
+    # PARENT_SCOPE, which only reaches this file's scope (vendor/) — forward
+    # it one more level so the sibling tests/ subdirectory can see it too.
+    set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} PARENT_SCOPE)
+endif()
 
 # --- spdlog -----------------------------------------------------------------
 set(SPDLOG_BUILD_EXAMPLE OFF CACHE BOOL "" FORCE)

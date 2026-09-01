@@ -55,7 +55,9 @@ std::shared_ptr<Mesh> Mesh::createCube(float size) {
         indices.insert(indices.end(), {base, base + 1, base + 2, base, base + 2, base + 3});
     }
 
-    return std::make_shared<Mesh>(vertices, indices);
+    auto mesh = std::make_shared<Mesh>(vertices, indices);
+    mesh->m_descriptor = {MeshSource::Cube, "", 0, size};
+    return mesh;
 }
 
 std::shared_ptr<Mesh> Mesh::createPlane(float size) {
@@ -67,7 +69,9 @@ std::shared_ptr<Mesh> Mesh::createPlane(float size) {
         {{-h, 0.0f,  h}, {0, 1, 0}, {0, 1}},
     };
     std::vector<uint32_t> indices = {0, 1, 2, 0, 2, 3};
-    return std::make_shared<Mesh>(vertices, indices);
+    auto mesh = std::make_shared<Mesh>(vertices, indices);
+    mesh->m_descriptor = {MeshSource::Plane, "", 0, size};
+    return mesh;
 }
 
 }  // namespace molly

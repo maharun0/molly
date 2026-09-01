@@ -36,13 +36,30 @@ static void joltTraceImpl(const char* fmt, ...) {
     MOLLY_TRACE("[Jolt] {0}", buffer);
 }
 
+// JPH::Factory::sInstance and the type registry are process-global state,
+// not per-PhysicsWorld — Jolt's own samples set them up once at program
+// start and tear them down once at exit. Every Scene owns a PhysicsWorld,
+// and more than one Scene can be alive at once (Play mode clones the edit
+// scene; tests construct multiple Scenes back to back), so this must be
+// reference-counted rather than unconditionally created/destroyed on every
+// init()/shutdown() call — doing that let a second PhysicsWorld's init()
+// silently replace (and a later shutdown() double-free) the first one's
+// Factory instance while it was still in use. Assumes Scene construction/
+// destruction happens on the main thread only (true everywhere in the
+// engine today); not atomic/mutex-guarded.
+static int s_physicsGlobalRefCount = 0;
+
 void PhysicsWorld::init() {
-    JPH::RegisterDefaultAllocator();
+    if (m_initialized) return;
+    m_initialized = true;
 
-    JPH::Trace = joltTraceImpl;
-
-    JPH::Factory::sInstance = new JPH::Factory();
-    JPH::RegisterTypes();
+    if (s_physicsGlobalRefCount == 0) {
+        JPH::RegisterDefaultAllocator();
+        JPH::Trace = joltTraceImpl;
+        JPH::Factory::sInstance = new JPH::Factory();
+        JPH::RegisterTypes();
+    }
+    ++s_physicsGlobalRefCount;
 
     m_tempAllocator = std::make_unique<JPH::TempAllocatorImpl>(10 * 1024 * 1024);
 
@@ -66,14 +83,20 @@ void PhysicsWorld::init() {
 }
 
 void PhysicsWorld::shutdown() {
+    if (!m_initialized) return;
+    m_initialized = false;
+
     m_system.reset();
     m_jobSystem.reset();
     m_tempAllocator.reset();
     m_contactListener.reset();
 
-    JPH::UnregisterTypes();
-    delete JPH::Factory::sInstance;
-    JPH::Factory::sInstance = nullptr;
+    --s_physicsGlobalRefCount;
+    if (s_physicsGlobalRefCount == 0) {
+        JPH::UnregisterTypes();
+        delete JPH::Factory::sInstance;
+        JPH::Factory::sInstance = nullptr;
+    }
 }
 
 void PhysicsWorld::step(float fixedDt) {

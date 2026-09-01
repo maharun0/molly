@@ -42,6 +42,8 @@ private:
     BroadPhaseLayerInterfaceImpl m_broadPhaseLayerInterface;
     ObjectVsBroadPhaseLayerFilterImpl m_objectVsBroadPhaseLayerFilter;
     ObjectLayerPairFilterImpl m_objectLayerPairFilter;
+
+    bool m_initialized = false;  // guards against a double init()/shutdown() call
 };
 
 }  // namespace molly

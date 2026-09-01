@@ -26,3 +26,9 @@
 [submodule "vendor/sol2"]
 	path = vendor/sol2
 	url = https://github.com/ThePhD/sol2.git
+[submodule "vendor/json"]
+	path = vendor/json
+	url = https://github.com/nlohmann/json.git
+[submodule "vendor/catch2"]
+	path = vendor/catch2
+	url = https://github.com/catchorg/Catch2.git

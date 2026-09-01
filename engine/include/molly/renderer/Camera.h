@@ -25,6 +25,15 @@ public:
     void setAspectRatio(float aspectRatio) { m_aspectRatio = aspectRatio; recalculate(); }
     void setFov(float fovDegrees) { m_fovDegrees = fovDegrees; recalculate(); }
     float getFov() const { return m_fovDegrees; }
+    float getAspectRatio() const { return m_aspectRatio; }
+
+    void setClipPlanes(float nearClip, float farClip) {
+        m_nearClip = nearClip;
+        m_farClip = farClip;
+        recalculate();
+    }
+    float getNearClip() const { return m_nearClip; }
+    float getFarClip() const { return m_farClip; }
 
     glm::vec3 getForward() const { return m_forward; }
     glm::vec3 getRight() const { return m_right; }

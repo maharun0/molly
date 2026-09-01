@@ -12,6 +12,7 @@
 #include "molly/ecs/Entity.h"
 #include "molly/ecs/Scene.h"
 #include "molly/ecs/Systems/CharacterControllerSystem.h"
+#include "molly/scene/SceneSerializer.h"
 #include "molly/scripting/ScriptComponent.h"
 
 namespace molly {
@@ -63,6 +64,12 @@ void ScriptEngine::registerBindings() {
     });
 
     molly.set_function("destroy_entity", [this](Entity entity) { m_scene->destroyEntity(entity); });
+
+    molly.set_function("spawn_entity", [this](const std::string& prefabPath, glm::vec3 position) -> sol::object {
+        Entity entity = SceneSerializer::instantiatePrefab(*m_scene, prefabPath, position);
+        if (!entity) return sol::lua_nil;
+        return sol::make_object(m_lua, entity);
+    });
 
     molly.set_function("move_towards", [](Entity entity, glm::vec3 target, float speed, float dt) {
         auto& transform = entity.getComponent<TransformComponent>();

@@ -16,6 +16,7 @@ target_link_libraries(molly-engine
         assimp::assimp
         Jolt::Jolt
         sol2
+        json
     PRIVATE
         molly_warnings
         molly_sanitizers
