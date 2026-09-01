@@ -6,6 +6,7 @@
 #include "molly/core/Events/WindowEvent.h"
 #include "molly/core/LayerStack.h"
 #include "molly/core/Window.h"
+#include "molly/resource/ResourceManager.h"
 
 namespace molly {
 
@@ -27,6 +28,7 @@ public:
     void pushOverlay(Layer* overlay);
 
     Window& getWindow() { return *m_window; }
+    ResourceManager& getResourceManager() { return m_resourceManager; }
     static Application& get() { return *s_instance; }
 
 private:
@@ -41,6 +43,7 @@ private:
     void renderFrame(float dt);
 
     std::unique_ptr<Window> m_window;
+    ResourceManager m_resourceManager;
     ImGuiLayer* m_imguiLayer = nullptr;
     LayerStack m_layerStack;
     bool m_running = true;

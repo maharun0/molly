@@ -64,6 +64,8 @@ bool Application::onWindowResize(WindowResizeEvent& e) {
 }
 
 void Application::renderFrame(float dt) {
+    m_resourceManager.update();
+
     if (!m_minimized) {
         for (Layer* layer : m_layerStack) layer->onUpdate(dt);
     }

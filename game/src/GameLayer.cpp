@@ -12,7 +12,13 @@ GameLayer::GameLayer() : Layer("GameLayer") {}
 void GameLayer::onAttach() {
     glEnable(GL_DEPTH_TEST);
 
-    auto shader = Shader::createFromFiles("assets/shaders/lit.vert", "assets/shaders/lit.frag");
+    // Enabled here (not in molly-demo's build config generally) mainly to
+    // exercise/prove the watcher end-to-end; a shipped game has no real
+    // need to watch its own asset files for changes (PLAN.md §14.4).
+    auto& resources = Application::get().getResourceManager();
+    resources.setHotReloadEnabled(true);
+
+    auto shader = resources.loadShader("assets/shaders/lit.vert", "assets/shaders/lit.frag");
 
     m_material = std::make_shared<Material>();
     m_material->shader = shader;
@@ -20,7 +26,8 @@ void GameLayer::onAttach() {
 
     auto floorMaterial = std::make_shared<Material>();
     floorMaterial->shader = shader;
-    floorMaterial->albedoColor = {0.35f, 0.38f, 0.42f};
+    floorMaterial->albedoColor = {1.0f, 1.0f, 1.0f};
+    floorMaterial->albedoTexture = AssetHandle<Texture2D>("assets/textures/floor_checker.png").get();
 
     auto wallMaterial = std::make_shared<Material>();
     wallMaterial->shader = shader;
@@ -34,7 +41,7 @@ void GameLayer::onAttach() {
     triggerMaterial->shader = shader;
     triggerMaterial->albedoColor = {0.9f, 0.9f, 0.2f};
 
-    auto boxMeshes = ModelLoader::load("assets/models/box/Box.gltf");
+    auto boxMeshes = resources.loadModel("assets/models/box/Box.gltf");
     std::shared_ptr<Mesh> boxMesh = boxMeshes.empty() ? Mesh::createCube() : boxMeshes[0];
 
     // Static floor: a large flat box collider under a plane mesh.

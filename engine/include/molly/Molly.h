@@ -41,4 +41,6 @@
 #include "molly/renderer/Texture.h"
 #include "molly/renderer/VertexArray.h"
 
+#include "molly/resource/AssetHandle.h"
 #include "molly/resource/ModelLoader.h"
+#include "molly/resource/ResourceManager.h"

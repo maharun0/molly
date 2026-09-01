@@ -31,27 +31,44 @@ static unsigned int compile(unsigned int type, const std::string& source) {
     return shader;
 }
 
-Shader::Shader(const std::string& vertexSrc, const std::string& fragmentSrc) {
+// Compiles+links a new program; returns 0 on failure (caller decides what to
+// do — a fresh Shader has nothing to fall back to, but reload() keeps the
+// previous program bound rather than replacing it with a broken one).
+static unsigned int compileAndLink(const std::string& vertexSrc, const std::string& fragmentSrc) {
     unsigned int vs = compile(GL_VERTEX_SHADER, vertexSrc);
     unsigned int fs = compile(GL_FRAGMENT_SHADER, fragmentSrc);
+    if (vs == 0 || fs == 0) {
+        if (vs) glDeleteShader(vs);
+        if (fs) glDeleteShader(fs);
+        return 0;
+    }
 
-    m_rendererId = glCreateProgram();
-    glAttachShader(m_rendererId, vs);
-    glAttachShader(m_rendererId, fs);
-    glLinkProgram(m_rendererId);
+    unsigned int program = glCreateProgram();
+    glAttachShader(program, vs);
+    glAttachShader(program, fs);
+    glLinkProgram(program);
 
     int success = 0;
-    glGetProgramiv(m_rendererId, GL_LINK_STATUS, &success);
+    glGetProgramiv(program, GL_LINK_STATUS, &success);
     if (!success) {
         int length = 0;
-        glGetProgramiv(m_rendererId, GL_INFO_LOG_LENGTH, &length);
+        glGetProgramiv(program, GL_INFO_LOG_LENGTH, &length);
         std::vector<char> log(static_cast<size_t>(length));
-        glGetProgramInfoLog(m_rendererId, length, &length, log.data());
+        glGetProgramInfoLog(program, length, &length, log.data());
         MOLLY_ERROR("Shader link error: {0}", log.data());
+        glDeleteShader(vs);
+        glDeleteShader(fs);
+        glDeleteProgram(program);
+        return 0;
     }
 
     glDeleteShader(vs);
     glDeleteShader(fs);
+    return program;
+}
+
+Shader::Shader(const std::string& vertexSrc, const std::string& fragmentSrc) {
+    m_rendererId = compileAndLink(vertexSrc, fragmentSrc);
 }
 
 static std::string readFile(const std::string& path) {
@@ -67,7 +84,26 @@ static std::string readFile(const std::string& path) {
 
 std::shared_ptr<Shader> Shader::createFromFiles(const std::string& vertexPath,
                                                  const std::string& fragmentPath) {
-    return std::make_shared<Shader>(readFile(vertexPath), readFile(fragmentPath));
+    auto shader = std::make_shared<Shader>(readFile(vertexPath), readFile(fragmentPath));
+    shader->m_vertexPath = vertexPath;
+    shader->m_fragmentPath = fragmentPath;
+    return shader;
+}
+
+bool Shader::reload() {
+    if (m_vertexPath.empty() || m_fragmentPath.empty()) return false;
+
+    unsigned int newProgram = compileAndLink(readFile(m_vertexPath), readFile(m_fragmentPath));
+    if (newProgram == 0) {
+        MOLLY_ERROR("Shader reload failed for \"{0}\" / \"{1}\" — keeping previous version",
+                    m_vertexPath, m_fragmentPath);
+        return false;
+    }
+
+    glDeleteProgram(m_rendererId);
+    m_rendererId = newProgram;
+    m_uniformLocationCache.clear();
+    return true;
 }
 
 Shader::~Shader() { glDeleteProgram(m_rendererId); }

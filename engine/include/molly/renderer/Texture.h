@@ -18,6 +18,13 @@ public:
 
     void setData(const void* data, uint32_t size);
 
+    // Re-reads the source file and re-uploads it, recreating the underlying
+    // GL texture object if its dimensions/format changed (immutable storage
+    // can't be resized in place). The C++ object and its shared_ptr identity
+    // are unaffected — only meaningful for textures loaded from a file (§14.4
+    // hot reload); no-op for the blank/framebuffer constructor.
+    bool reload();
+
     uint32_t getWidth() const { return m_width; }
     uint32_t getHeight() const { return m_height; }
     uint32_t getRendererId() const { return m_rendererId; }

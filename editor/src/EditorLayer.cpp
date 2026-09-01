@@ -14,7 +14,12 @@ EditorLayer::EditorLayer() : Layer("EditorLayer") {}
 void EditorLayer::onAttach() {
     glEnable(GL_DEPTH_TEST);
 
-    auto shader = Shader::createFromFiles("assets/shaders/lit.vert", "assets/shaders/lit.frag");
+    // The editor is the primary place hot reload earns its keep — tweak a
+    // shader on disk, see it update in the Viewport without restarting.
+    auto& resources = Application::get().getResourceManager();
+    resources.setHotReloadEnabled(true);
+
+    auto shader = resources.loadShader("assets/shaders/lit.vert", "assets/shaders/lit.frag");
 
     m_material = std::make_shared<Material>();
     m_material->shader = shader;
@@ -22,9 +27,10 @@ void EditorLayer::onAttach() {
 
     auto floorMaterial = std::make_shared<Material>();
     floorMaterial->shader = shader;
-    floorMaterial->albedoColor = {0.35f, 0.38f, 0.42f};
+    floorMaterial->albedoColor = {1.0f, 1.0f, 1.0f};
+    floorMaterial->albedoTexture = AssetHandle<Texture2D>("assets/textures/floor_checker.png").get();
 
-    auto boxMeshes = ModelLoader::load("assets/models/box/Box.gltf");
+    auto boxMeshes = resources.loadModel("assets/models/box/Box.gltf");
     std::shared_ptr<Mesh> boxMesh = boxMeshes.empty() ? Mesh::createCube() : boxMeshes[0];
 
     Entity floor = m_scene.createEntity("Floor");
