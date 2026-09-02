@@ -9,6 +9,28 @@
 
 namespace molly {
 
+namespace {
+// Deliberately not the theme's accent blue — an outline needs to read
+// clearly against arbitrary object/material colors, including blue ones.
+constexpr const char* kOutlineVertSrc = R"(
+#version 460 core
+layout(location = 0) in vec3 a_Position;
+uniform mat4 u_ViewProjection;
+uniform mat4 u_Model;
+void main() {
+    gl_Position = u_ViewProjection * u_Model * vec4(a_Position, 1.0);
+}
+)";
+constexpr const char* kOutlineFragSrc = R"(
+#version 460 core
+out vec4 o_Color;
+uniform vec3 u_Color;
+void main() {
+    o_Color = vec4(u_Color, 1.0);
+}
+)";
+}  // namespace
+
 ViewportPanel::ViewportPanel() {
     m_editorCamera = PerspectiveCamera(60.0f, m_viewportSize.x / m_viewportSize.y, 0.1f, 100.0f);
     m_editorCamera.setPosition({2.5f, 2.5f, 2.5f});
@@ -62,11 +84,96 @@ void ViewportPanel::updateEditorCamera(float dt) {
 
 void ViewportPanel::onUpdate(float dt) { updateEditorCamera(dt); }
 
-void ViewportPanel::onImGuiRender(Scene* scene, PerspectiveCamera* overrideCamera) {
+void ViewportPanel::frameEntity(entt::registry& registry, entt::entity entity) {
+    if (!registry.valid(entity)) return;
+
+    glm::mat4 world = getWorldTransform(registry, entity);
+    glm::vec3 targetPos(world[3]);
+
+    // No per-mesh bounds are tracked, so a fixed distance is used rather
+    // than fitting to the object's actual size — good enough to bring an
+    // off-screen selection back into view without needing bounding-box
+    // plumbing through Mesh/MeshRendererComponent.
+    constexpr float kFrameDistance = 4.0f;
+    m_editorCamera.setPosition(targetPos - m_editorCamera.getForward() * kFrameDistance);
+}
+
+void ViewportPanel::drawWireframeMesh(Mesh& mesh, const glm::mat4& model,
+                                       const glm::mat4& viewProjection, const glm::vec3& color) {
+    if (!m_outlineShader) {
+        m_outlineShader = std::make_shared<Shader>(kOutlineVertSrc, kOutlineFragSrc);
+    }
+
+    GLint prevPolygonMode[2];
+    glGetIntegerv(GL_POLYGON_MODE, prevPolygonMode);
+
+    m_outlineShader->bind();
+    m_outlineShader->setMat4("u_ViewProjection", viewProjection);
+    m_outlineShader->setMat4("u_Model", model);
+    m_outlineShader->setFloat3("u_Color", color);
+
+    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+    glLineWidth(2.0f);
+    glDepthFunc(GL_LEQUAL);
+
+    mesh.bind();
+    glDrawElements(GL_TRIANGLES, static_cast<int>(mesh.getIndexCount()), GL_UNSIGNED_INT, nullptr);
+
+    glPolygonMode(GL_FRONT_AND_BACK, static_cast<GLenum>(prevPolygonMode[0]));
+    glLineWidth(1.0f);
+    glDepthFunc(GL_LESS);
+}
+
+void ViewportPanel::drawSelectionOutline(entt::registry& registry, entt::entity entity,
+                                          const glm::mat4& viewProjection) {
+    if (!registry.valid(entity)) return;
+
+    glm::mat4 model = getWorldTransform(registry, entity);
+
+    if (auto* meshRenderer = registry.try_get<MeshRendererComponent>(entity);
+        meshRenderer && meshRenderer->mesh) {
+        drawWireframeMesh(*meshRenderer->mesh, model, viewProjection, glm::vec3(1.0f, 0.55f, 0.0f));
+        return;
+    }
+
+    // No mesh (e.g. a light or camera entity) — outline the gizmo marker
+    // instead of skipping the selection highlight entirely.
+    if (registry.any_of<LightComponent, CameraComponent>(entity)) {
+        if (!m_gizmoMesh) m_gizmoMesh = Mesh::createCube(0.3f);
+        drawWireframeMesh(*m_gizmoMesh, model, viewProjection, glm::vec3(1.0f, 0.55f, 0.0f));
+    }
+}
+
+void ViewportPanel::drawEntityGizmos(entt::registry& registry, const glm::mat4& viewProjection) {
+    if (!m_gizmoMesh) m_gizmoMesh = Mesh::createCube(0.3f);
+
+    for (auto entity : registry.view<TransformComponent, LightComponent>()) {
+        glm::mat4 model = getWorldTransform(registry, entity);
+        drawWireframeMesh(*m_gizmoMesh, model, viewProjection, glm::vec3(1.0f, 0.9f, 0.3f));
+    }
+    for (auto entity : registry.view<TransformComponent, CameraComponent>()) {
+        glm::mat4 model = getWorldTransform(registry, entity);
+        drawWireframeMesh(*m_gizmoMesh, model, viewProjection, glm::vec3(0.3f, 0.85f, 1.0f));
+    }
+}
+
+void ViewportPanel::onImGuiRender(Scene* scene, PerspectiveCamera* overrideCamera, Entity selected) {
     if (!isOpen) return;
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
     ImGui::Begin("Viewport", &isOpen);
     m_focused = ImGui::IsWindowFocused() || ImGui::IsWindowHovered();
+
+    // Read here, not in onUpdate() — onUpdate() runs before ImGui::NewFrame()
+    // each frame, so io.MouseWheel there is always one frame stale (it's only
+    // refreshed by NewFrame draining the queued scroll events). Scroll-wheel
+    // dolly zoom works whenever the viewport is hovered, independent of the
+    // RMB fly-look mode (matches Unity/Godot/Blender's scene-view zoom).
+    if (m_focused && ImGui::GetIO().MouseWheel != 0.0f && overrideCamera == nullptr) {
+        constexpr float zoomSpeed = 1.0f;
+        glm::vec3 pos = m_editorCamera.getPosition();
+        pos += m_editorCamera.getForward() * ImGui::GetIO().MouseWheel * zoomSpeed;
+        m_editorCamera.setPosition(pos);
+    }
 
     ImVec2 size = ImGui::GetContentRegionAvail();
     if (size.x > 0 && size.y > 0 &&
@@ -84,6 +191,12 @@ void ViewportPanel::onImGuiRender(Scene* scene, PerspectiveCamera* overrideCamer
     if (scene) {
         PerspectiveCamera& camera = overrideCamera ? *overrideCamera : m_editorCamera;
         renderScene(scene->getRegistry(), camera.getViewProjectionMatrix(), camera.getPosition());
+        if (!overrideCamera) {
+            drawEntityGizmos(scene->getRegistry(), camera.getViewProjectionMatrix());
+        }
+        if (selected) {
+            drawSelectionOutline(scene->getRegistry(), selected, camera.getViewProjectionMatrix());
+        }
     }
 
     m_framebuffer->unbind();
@@ -108,7 +221,7 @@ void ViewportPanel::onImGuiRender(Scene* scene, PerspectiveCamera* overrideCamer
     drawList->AddText(ImVec2(imageMin.x + 8, imageMin.y + 6), IM_COL32(255, 255, 255, 200), fpsText);
 
     if (m_focused && !overrideCamera) {
-        const char* hint = "RMB + WASD/QE to fly";
+        const char* hint = "RMB + WASD/QE to fly | Scroll to zoom | F to focus selection";
         drawList->AddText(ImVec2(imageMin.x + 8, imageMin.y + 24), IM_COL32(220, 220, 220, 160), hint);
     }
 

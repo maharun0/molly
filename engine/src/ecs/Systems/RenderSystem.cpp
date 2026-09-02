@@ -22,6 +22,13 @@ glm::mat4 getWorldTransform(entt::registry& registry, entt::entity entity) {
 
 void renderScene(entt::registry& registry, const glm::mat4& viewProjection,
                   const glm::vec3& cameraPosition) {
+    // Without this, fragments are painted in whatever order entt iterates
+    // entities (reverse creation order), not by distance to the camera —
+    // e.g. a large floor plane created before a prop draws over it even
+    // though the prop is closer to the camera.
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+
     // Gather lights: first directional light found, plus up to 8 point lights.
     Light dirLight;
     bool hasDirLight = false;

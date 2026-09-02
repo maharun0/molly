@@ -58,16 +58,25 @@ void EditorLayer::buildDefaultScene() {
     propRenderer.material = m_material;
 
     Entity light = m_editScene->createEntity("Sun");
-    light.getComponent<TransformComponent>().rotation = {-45.0f, 45.0f, 0.0f};
+    auto& lightTransform = light.getComponent<TransformComponent>();
+    lightTransform.position = {0.0f, 4.0f, 0.0f};
+    lightTransform.rotation = {-45.0f, 45.0f, 0.0f};
     auto& lightComp = light.addComponent<LightComponent>();
     lightComp.type = LightType::Directional;
     lightComp.color = {1.0f, 0.96f, 0.9f};
     lightComp.intensity = 1.1f;
 
     Entity camera = m_editScene->createEntity("MainCamera");
+    glm::vec3 cameraStartPos = {0.0f, 4.0f, 6.0f};
+    // Keep the entity's TransformComponent in sync with the CameraComponent's
+    // own PerspectiveCamera position — the two aren't linked by any system,
+    // so setting only one would leave the Hierarchy/Inspector-visible
+    // Transform (and this entity's gizmo marker) pointing somewhere the
+    // camera doesn't actually render from.
+    camera.getComponent<TransformComponent>().position = cameraStartPos;
     auto& cameraComp = camera.addComponent<CameraComponent>();
     cameraComp.camera = PerspectiveCamera(55.0f, 16.0f / 9.0f, 0.1f, 100.0f);
-    cameraComp.camera.setPosition({0.0f, 3.0f, 5.0f});
+    cameraComp.camera.setPosition(cameraStartPos);
     cameraComp.camera.setPitchYaw(-25.0f, -90.0f);
     cameraComp.primary = true;
 }
@@ -143,7 +152,8 @@ void EditorLayer::setStatusMessage(const std::string& message) {
 }
 
 static void handleKeyboardShortcuts(bool& openRequested, bool& saveRequested, bool& newRequested,
-                                     bool& playToggleRequested, bool& deleteRequested) {
+                                     bool& playToggleRequested, bool& deleteRequested,
+                                     bool& frameSelectedRequested) {
     ImGuiIO& io = ImGui::GetIO();
     if (io.WantTextInput) return;  // don't steal keys while typing in a text field
 
@@ -152,13 +162,14 @@ static void handleKeyboardShortcuts(bool& openRequested, bool& saveRequested, bo
     if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_N, false)) newRequested = true;
     if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_P, false)) playToggleRequested = true;
     if (ImGui::IsKeyPressed(ImGuiKey_Delete, false)) deleteRequested = true;
+    if (!io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_F, false)) frameSelectedRequested = true;
 }
 
 void EditorLayer::onUpdate(float dt) {
     bool openRequested = false, saveRequested = false, newRequested = false;
-    bool playToggleRequested = false, deleteRequested = false;
+    bool playToggleRequested = false, deleteRequested = false, frameSelectedRequested = false;
     handleKeyboardShortcuts(openRequested, saveRequested, newRequested, playToggleRequested,
-                             deleteRequested);
+                             deleteRequested, frameSelectedRequested);
     if (newRequested) newScene();
     if (saveRequested) saveScene();
     if (openRequested) openScene();
@@ -169,6 +180,10 @@ void EditorLayer::onUpdate(float dt) {
     if (deleteRequested && m_hierarchyPanel.getSelected()) {
         activeScene()->destroyEntity(m_hierarchyPanel.getSelected());
         m_hierarchyPanel.setSelected({});
+    }
+    if (frameSelectedRequested && m_playState == EditorPlayState::Edit &&
+        m_hierarchyPanel.getSelected()) {
+        m_viewportPanel.frameEntity(activeScene()->getRegistry(), m_hierarchyPanel.getSelected());
     }
 
     if (m_statusMessageTimer > 0.0f) {
@@ -413,7 +428,7 @@ void EditorLayer::onImGuiRender() {
             overrideCamera = &scene->getRegistry().get<CameraComponent>(camEntity).camera;
         }
     }
-    m_viewportPanel.onImGuiRender(scene, overrideCamera);
+    m_viewportPanel.onImGuiRender(scene, overrideCamera, m_hierarchyPanel.getSelected());
 }
 
 }  // namespace molly
