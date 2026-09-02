@@ -1,0 +1,40 @@
+{
+  "entities": [
+    {
+      "components": {
+        "Light": {
+          "color": [
+            1.0,
+            0.9599999785423279,
+            0.8999999761581421
+          ],
+          "intensity": 1.100000023841858,
+          "radius": 10.0,
+          "type": "Directional"
+        },
+        "Tag": {
+          "name": "Sun"
+        },
+        "Transform": {
+          "position": [
+            0.0,
+            0.0,  
+            0.0
+          ],
+          "rotation": [
+            -45.0,
+            45.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        }
+      },
+      "id": 0
+    }
+  ],
+  "molly_version": "0.8.0"
+}
