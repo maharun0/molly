@@ -24,6 +24,8 @@ public:
     bool isFocused() const { return m_focused; }
     PerspectiveCamera& getEditorCamera() { return m_editorCamera; }
 
+    bool isOpen = true;
+
 private:
     void updateEditorCamera(float dt);
 

@@ -40,6 +40,8 @@ public:
 
     void onImGuiRender();
 
+    bool isOpen = true;
+
 private:
     std::shared_ptr<EditorConsoleSink> m_sink;
     bool m_showTrace = false;

@@ -56,6 +56,9 @@ public:
     void setVSync(bool enabled);
     bool isVSync() const { return m_data.vsync; }
 
+    void setTitle(const std::string& title);
+    const std::string& getTitle() const { return m_data.title; }
+
     GLFWwindow* getNativeWindow() const { return m_window; }
 
 private:

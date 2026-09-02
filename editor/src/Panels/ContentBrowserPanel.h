@@ -14,6 +14,8 @@ public:
 
     void onImGuiRender();
 
+    bool isOpen = true;
+
 private:
     void drawDirectory(const std::filesystem::path& path);
 

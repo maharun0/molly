@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <string>
 
 #include <molly/Molly.h>
 
@@ -26,6 +27,10 @@ private:
     void buildDefaultScene();
     void drawMenuBar();
     void drawToolbar();
+    void drawStatusBar();
+    void drawSaveSceneAsModal();
+    void drawCreatePrefabModal();
+    void setStatusMessage(const std::string& message);
     Scene* activeScene();
 
     void onPlay();
@@ -35,7 +40,7 @@ private:
     void newScene();
     void saveScene();
     void openScene();
-    void createPrefabFromSelection();
+    void createPrefabFromSelection(Entity target);
 
     std::unique_ptr<Scene> m_editScene;
     std::unique_ptr<Scene> m_runtimeScene;
@@ -44,6 +49,14 @@ private:
     std::shared_ptr<Material> m_material;
     char m_scenePathBuffer[256] = "assets/scenes/main.scene.json";
     char m_prefabPathBuffer[256] = "assets/prefabs/new_prefab.prefab.json";
+    Entity m_prefabModalTarget;
+    bool m_openSaveSceneAsModal = false;
+    bool m_openCreatePrefabModal = false;
+
+    bool m_resetLayoutRequested = false;
+
+    std::string m_statusMessage = "Ready";
+    float m_statusMessageTimer = 0.0f;
 
     SceneHierarchyPanel m_hierarchyPanel;
     InspectorPanel m_inspectorPanel;

@@ -11,6 +11,9 @@ class InspectorPanel {
 public:
     void onImGuiRender(Scene* scene, Entity selected);
 
+    // Backs the Window menu's show/hide checkbox (plan/EDITOR_UI_PLAN.md §9.1).
+    bool isOpen = true;
+
 private:
     void drawAddComponentMenu(Entity entity);
 };

@@ -46,6 +46,10 @@ void Window::init(const WindowProps& props) {
                                  m_data.title.c_str(), nullptr, nullptr);
     ++s_glfwWindowCount;
 
+    // Below this, the standard five-panel editor layout genuinely can't
+    // display anything usefully (plan/EDITOR_UI_PLAN.md §14.1).
+    glfwSetWindowSizeLimits(m_window, 1024, 720, GLFW_DONT_CARE, GLFW_DONT_CARE);
+
     glfwMakeContextCurrent(m_window);
     int gladVersion = gladLoadGL(reinterpret_cast<GLADloadfunc>(glfwGetProcAddress));
     if (gladVersion == 0) {
@@ -155,6 +159,11 @@ void Window::presentFrame() { glfwSwapBuffers(m_window); }
 void Window::setVSync(bool enabled) {
     glfwSwapInterval(enabled ? 1 : 0);
     m_data.vsync = enabled;
+}
+
+void Window::setTitle(const std::string& title) {
+    m_data.title = title;
+    glfwSetWindowTitle(m_window, title.c_str());
 }
 
 }  // namespace molly

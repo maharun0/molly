@@ -5,7 +5,20 @@
 
 #include <imgui.h>
 
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
+#include <shellapi.h>
+#pragma comment(lib, "shell32.lib")
+
 namespace molly {
+
+// Opens `path` in whatever the OS considers the default handler for its
+// file type (e.g. a text editor for .lua) — Windows-only, matching the
+// engine's Windows-only scope (PLAN.md §1.2).
+static void openInSystemEditor(const std::filesystem::path& path) {
+    std::wstring wpath = path.wstring();
+    ShellExecuteW(nullptr, L"open", wpath.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+}
 
 ContentBrowserPanel::ContentBrowserPanel() : m_rootPath("assets") {}
 
@@ -33,12 +46,16 @@ void ContentBrowserPanel::drawDirectory(const std::filesystem::path& path) {
             ImGui::TreeNodeEx(name.c_str(),
                                ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen |
                                    ImGuiTreeNodeFlags_Bullet);
+            if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+                openInSystemEditor(entry.path());
+            }
         }
     }
 }
 
 void ContentBrowserPanel::onImGuiRender() {
-    ImGui::Begin("Content Browser");
+    if (!isOpen) return;
+    ImGui::Begin("Content Browser", &isOpen);
     drawDirectory(m_rootPath);
     ImGui::End();
 }

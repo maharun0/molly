@@ -1,5 +1,7 @@
 #include "ViewportPanel.h"
 
+#include <cstdio>
+
 #include <glad/gl.h>
 #include <imgui.h>
 
@@ -61,8 +63,9 @@ void ViewportPanel::updateEditorCamera(float dt) {
 void ViewportPanel::onUpdate(float dt) { updateEditorCamera(dt); }
 
 void ViewportPanel::onImGuiRender(Scene* scene, PerspectiveCamera* overrideCamera) {
+    if (!isOpen) return;
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-    ImGui::Begin("Viewport");
+    ImGui::Begin("Viewport", &isOpen);
     m_focused = ImGui::IsWindowFocused() || ImGui::IsWindowHovered();
 
     ImVec2 size = ImGui::GetContentRegionAvail();
@@ -87,6 +90,28 @@ void ViewportPanel::onImGuiRender(Scene* scene, PerspectiveCamera* overrideCamer
 
     ImGui::Image(static_cast<ImTextureID>(static_cast<intptr_t>(m_framebuffer->getColorAttachmentRendererId())),
                  size, ImVec2(0, 1), ImVec2(1, 0));
+
+    ImVec2 imageMin = ImGui::GetItemRectMin();
+    ImVec2 imageMax = ImGui::GetItemRectMax();
+    ImDrawList* drawList = ImGui::GetWindowDrawList();
+
+    // Play-mode border tint (plan/EDITOR_UI_PLAN.md §9.3.1) — a non-null
+    // overrideCamera means we're rendering through the runtime scene's own
+    // camera, i.e. Playing or Paused, not Edit mode.
+    if (overrideCamera) {
+        ImU32 borderColor = IM_COL32(61, 139, 255, 255);  // kAccent, Appendix C
+        drawList->AddRect(imageMin, imageMax, borderColor, 0.0f, 0, 3.0f);
+    }
+
+    char fpsText[32];
+    std::snprintf(fpsText, sizeof(fpsText), "%.0f FPS", ImGui::GetIO().Framerate);
+    drawList->AddText(ImVec2(imageMin.x + 8, imageMin.y + 6), IM_COL32(255, 255, 255, 200), fpsText);
+
+    if (m_focused && !overrideCamera) {
+        const char* hint = "RMB + WASD/QE to fly";
+        drawList->AddText(ImVec2(imageMin.x + 8, imageMin.y + 24), IM_COL32(220, 220, 220, 160), hint);
+    }
+
     ImGui::End();
     ImGui::PopStyleVar();
 }

@@ -47,17 +47,21 @@ static ImVec4 colorForLevel(int level) {
 }
 
 void ConsolePanel::onImGuiRender() {
-    ImGui::Begin("Console");
+    if (!isOpen) return;
+    ImGui::Begin("Console", &isOpen);
 
     if (ImGui::Button("Clear")) m_sink->clear();
-    ImGui::SameLine();
-    ImGui::Checkbox("Trace", &m_showTrace);
-    ImGui::SameLine();
-    ImGui::Checkbox("Info", &m_showInfo);
-    ImGui::SameLine();
-    ImGui::Checkbox("Warn", &m_showWarn);
-    ImGui::SameLine();
-    ImGui::Checkbox("Error", &m_showError);
+
+    auto coloredCheckbox = [](const char* label, bool* value, ImVec4 color) {
+        ImGui::SameLine();
+        ImGui::PushStyleColor(ImGuiCol_Text, color);
+        ImGui::Checkbox(label, value);
+        ImGui::PopStyleColor();
+    };
+    coloredCheckbox("Trace", &m_showTrace, colorForLevel(static_cast<int>(spdlog::level::trace)));
+    coloredCheckbox("Info", &m_showInfo, colorForLevel(static_cast<int>(spdlog::level::info)));
+    coloredCheckbox("Warn", &m_showWarn, colorForLevel(static_cast<int>(spdlog::level::warn)));
+    coloredCheckbox("Error", &m_showError, colorForLevel(static_cast<int>(spdlog::level::err)));
     ImGui::SameLine();
     ImGui::SetNextItemWidth(160.0f);
     ImGui::InputTextWithHint("##search", "Search...", m_searchBuffer, sizeof(m_searchBuffer));
@@ -79,6 +83,8 @@ void ConsolePanel::onImGuiRender() {
         ImGui::PushStyleColor(ImGuiCol_Text, colorForLevel(message.level));
         ImGui::TextUnformatted(message.text.c_str());
         ImGui::PopStyleColor();
+        if (ImGui::IsItemClicked()) ImGui::SetClipboardText(message.text.c_str());
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Click to copy");
     }
 
     if (ImGui::GetScrollY() >= ImGui::GetScrollMaxY() - 1.0f) ImGui::SetScrollHereY(1.0f);

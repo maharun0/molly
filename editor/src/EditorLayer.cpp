@@ -1,16 +1,27 @@
 #include "EditorLayer.h"
 
+#include <cstdio>
 #include <filesystem>
 
 #include <imgui.h>
 
+#include "DockLayout.h"
+
 namespace molly {
+
+constexpr float kToolbarHeight = 36.0f;
+constexpr float kStatusBarHeight = 24.0f;
 
 EditorLayer::EditorLayer() : Layer("EditorLayer") {}
 
 void EditorLayer::onAttach() {
     m_editScene = std::make_unique<Scene>();
     buildDefaultScene();
+
+    m_hierarchyPanel.onCreatePrefabRequested = [this](Entity entity) {
+        m_prefabModalTarget = entity;
+        m_openCreatePrefabModal = true;
+    };
 }
 
 void EditorLayer::buildDefaultScene() {
@@ -86,35 +97,85 @@ void EditorLayer::newScene() {
     if (m_playState != EditorPlayState::Edit) onStop();
     m_editScene = std::make_unique<Scene>();
     m_hierarchyPanel.setSelected({});
+    Application::get().getWindow().setTitle("Molly Editor - untitled");
 }
 
 void EditorLayer::saveScene() {
     std::filesystem::path path(m_scenePathBuffer);
     std::error_code ec;
     if (path.has_parent_path()) std::filesystem::create_directories(path.parent_path(), ec);
-    SceneSerializer::serialize(*m_editScene, m_scenePathBuffer);
+    if (SceneSerializer::serialize(*m_editScene, m_scenePathBuffer)) {
+        setStatusMessage(std::string("Scene saved: ") + m_scenePathBuffer);
+        Application::get().getWindow().setTitle(
+            "Molly Editor - " + path.filename().string());
+    }
 }
 
 void EditorLayer::openScene() {
     auto loaded = std::make_unique<Scene>();
-    if (!SceneSerializer::deserialize(m_scenePathBuffer, *loaded)) return;
+    if (!SceneSerializer::deserialize(m_scenePathBuffer, *loaded)) {
+        setStatusMessage(std::string("Failed to open scene: ") + m_scenePathBuffer);
+        return;
+    }
 
     if (m_playState != EditorPlayState::Edit) onStop();
     m_editScene = std::move(loaded);
     m_hierarchyPanel.setSelected({});
+    setStatusMessage(std::string("Scene opened: ") + m_scenePathBuffer);
+    Application::get().getWindow().setTitle(
+        "Molly Editor - " + std::filesystem::path(m_scenePathBuffer).filename().string());
 }
 
-void EditorLayer::createPrefabFromSelection() {
-    Entity selected = m_hierarchyPanel.getSelected();
-    if (!selected) return;
+void EditorLayer::createPrefabFromSelection(Entity target) {
+    if (!target) return;
 
     std::filesystem::path path(m_prefabPathBuffer);
     std::error_code ec;
     if (path.has_parent_path()) std::filesystem::create_directories(path.parent_path(), ec);
-    SceneSerializer::serializePrefab(selected, m_prefabPathBuffer);
+    if (SceneSerializer::serializePrefab(target, m_prefabPathBuffer)) {
+        setStatusMessage(std::string("Prefab created: ") + m_prefabPathBuffer);
+    }
+}
+
+void EditorLayer::setStatusMessage(const std::string& message) {
+    m_statusMessage = message;
+    m_statusMessageTimer = 2.5f;
+}
+
+static void handleKeyboardShortcuts(bool& openRequested, bool& saveRequested, bool& newRequested,
+                                     bool& playToggleRequested, bool& deleteRequested) {
+    ImGuiIO& io = ImGui::GetIO();
+    if (io.WantTextInput) return;  // don't steal keys while typing in a text field
+
+    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_S, false)) saveRequested = true;
+    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_O, false)) openRequested = true;
+    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_N, false)) newRequested = true;
+    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_P, false)) playToggleRequested = true;
+    if (ImGui::IsKeyPressed(ImGuiKey_Delete, false)) deleteRequested = true;
 }
 
 void EditorLayer::onUpdate(float dt) {
+    bool openRequested = false, saveRequested = false, newRequested = false;
+    bool playToggleRequested = false, deleteRequested = false;
+    handleKeyboardShortcuts(openRequested, saveRequested, newRequested, playToggleRequested,
+                             deleteRequested);
+    if (newRequested) newScene();
+    if (saveRequested) saveScene();
+    if (openRequested) openScene();
+    if (playToggleRequested) {
+        if (m_playState == EditorPlayState::Edit) onPlay();
+        else onStop();
+    }
+    if (deleteRequested && m_hierarchyPanel.getSelected()) {
+        activeScene()->destroyEntity(m_hierarchyPanel.getSelected());
+        m_hierarchyPanel.setSelected({});
+    }
+
+    if (m_statusMessageTimer > 0.0f) {
+        m_statusMessageTimer -= dt;
+        if (m_statusMessageTimer <= 0.0f) m_statusMessage = "Ready";
+    }
+
     if (m_playState == EditorPlayState::Edit) {
         // No physics/scripts in edit mode (PLAN.md §18.4) — only the fly
         // camera moves; the scene itself is static until Play is pressed.
@@ -129,9 +190,40 @@ void EditorLayer::drawMenuBar() {
     if (!ImGui::BeginMainMenuBar()) return;
 
     if (ImGui::BeginMenu("File")) {
-        if (ImGui::MenuItem("New Scene")) newScene();
-        if (ImGui::MenuItem("Save Scene")) saveScene();
-        if (ImGui::MenuItem("Open Scene")) openScene();
+        if (ImGui::MenuItem("New Scene", "Ctrl+N")) newScene();
+        if (ImGui::MenuItem("Save Scene", "Ctrl+S")) saveScene();
+        if (ImGui::MenuItem("Save Scene As...")) m_openSaveSceneAsModal = true;
+        if (ImGui::MenuItem("Open Scene", "Ctrl+O")) openScene();
+        ImGui::Separator();
+        if (ImGui::MenuItem("Exit")) Application::get().close();
+        ImGui::EndMenu();
+    }
+
+    if (ImGui::BeginMenu("Edit")) {
+        // Undo/Redo are explicitly deferred (PLAN.md §32 Milestone 7.9) —
+        // shown disabled rather than omitted so the menu sets correct
+        // expectations that it's planned, not forgotten
+        // (plan/EDITOR_UI_PLAN.md §9.1).
+        ImGui::BeginDisabled(true);
+        ImGui::MenuItem("Undo", "Ctrl+Z");
+        ImGui::MenuItem("Redo", "Ctrl+Y");
+        ImGui::EndDisabled();
+        ImGui::EndMenu();
+    }
+
+    if (ImGui::BeginMenu("Window")) {
+        if (ImGui::MenuItem("Reset Layout")) m_resetLayoutRequested = true;
+        ImGui::Separator();
+        ImGui::MenuItem("Hierarchy", nullptr, &m_hierarchyPanel.isOpen);
+        ImGui::MenuItem("Viewport", nullptr, &m_viewportPanel.isOpen);
+        ImGui::MenuItem("Inspector", nullptr, &m_inspectorPanel.isOpen);
+        ImGui::MenuItem("Content Browser", nullptr, &m_contentBrowserPanel.isOpen);
+        ImGui::MenuItem("Console", nullptr, &m_consolePanel.isOpen);
+        ImGui::EndMenu();
+    }
+
+    if (ImGui::BeginMenu("Help")) {
+        ImGui::MenuItem("About Molly (coming soon)", nullptr, false, false);
         ImGui::EndMenu();
     }
 
@@ -139,8 +231,19 @@ void EditorLayer::drawMenuBar() {
 }
 
 void EditorLayer::drawToolbar() {
-    ImGui::Begin("Toolbar", nullptr, ImGuiWindowFlags_NoScrollbar);
+    ImGuiViewport* viewport = ImGui::GetMainViewport();
+    float menuBarHeight = ImGui::GetFrameHeight();
 
+    ImGui::SetNextWindowPos(ImVec2(viewport->Pos.x, viewport->Pos.y + menuBarHeight));
+    ImGui::SetNextWindowSize(ImVec2(viewport->Size.x, kToolbarHeight));
+
+    ImGuiWindowFlags flags = ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar |
+                              ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+                              ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings |
+                              ImGuiWindowFlags_NoCollapse;
+    ImGui::Begin("##Toolbar", nullptr, flags);
+
+    // Left zone: transport controls.
     bool playing = m_playState != EditorPlayState::Edit;
     if (!playing) {
         if (ImGui::Button("Play")) onPlay();
@@ -151,45 +254,150 @@ void EditorLayer::drawToolbar() {
         if (ImGui::Button(pauseLabel)) onPause();
     }
 
-    ImGui::SameLine();
-    const char* stateLabel = m_playState == EditorPlayState::Edit     ? "Edit"
+    // Right zone: state badge, right-aligned.
+    const char* stateLabel = m_playState == EditorPlayState::Edit      ? "Edit Mode"
                               : m_playState == EditorPlayState::Playing ? "Playing"
                                                                         : "Paused";
-    ImGui::TextDisabled("(%s)", stateLabel);
-
-    ImGui::Separator();
-    ImGui::SetNextItemWidth(320.0f);
-    ImGui::InputText("Scene Path", m_scenePathBuffer, sizeof(m_scenePathBuffer));
-
-    ImGui::SetNextItemWidth(320.0f);
-    ImGui::InputText("Prefab Path", m_prefabPathBuffer, sizeof(m_prefabPathBuffer));
-    ImGui::SameLine();
-    bool hasSelection = static_cast<bool>(m_hierarchyPanel.getSelected());
-    ImGui::BeginDisabled(!hasSelection);
-    if (ImGui::Button("Create Prefab From Selection")) createPrefabFromSelection();
-    ImGui::EndDisabled();
+    ImVec4 badgeColor = m_playState == EditorPlayState::Edit      ? ImVec4(0.30f, 0.32f, 0.36f, 1.0f)
+                        : m_playState == EditorPlayState::Playing ? ImVec4(0.24f, 0.55f, 1.0f, 1.0f)
+                                                                    : ImVec4(0.90f, 0.72f, 0.30f, 1.0f);
+    float badgeWidth = ImGui::CalcTextSize(stateLabel).x + 24.0f;
+    ImGui::SameLine(ImGui::GetWindowWidth() - badgeWidth - 12.0f);
+    ImGui::PushStyleColor(ImGuiCol_Button, badgeColor);
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, badgeColor);
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, badgeColor);
+    ImGui::Button(stateLabel, ImVec2(badgeWidth, 0));
+    ImGui::PopStyleColor(3);
 
     ImGui::End();
 }
 
-void EditorLayer::onImGuiRender() {
-    // Turns the main window into a dockspace host so panels can be freely
-    // docked/rearranged (PLAN.md §18.2). A pre-arranged first-launch layout
-    // via ImGui's DockBuilder API is listed there as a nice-to-have; left
-    // as a follow-up since getting it right needs visual iteration this
-    // session can't do — panels currently start floating and the user
-    // docks them once, which ImGui then remembers via imgui.ini.
-    ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode);
+void EditorLayer::drawStatusBar() {
+    ImGuiViewport* viewport = ImGui::GetMainViewport();
 
+    ImGui::SetNextWindowPos(
+        ImVec2(viewport->Pos.x, viewport->Pos.y + viewport->Size.y - kStatusBarHeight));
+    ImGui::SetNextWindowSize(ImVec2(viewport->Size.x, kStatusBarHeight));
+
+    ImGuiWindowFlags flags = ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar |
+                              ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+                              ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings |
+                              ImGuiWindowFlags_NoCollapse;
+    ImGui::Begin("##StatusBar", nullptr, flags);
+
+    ImGui::TextUnformatted(m_statusMessage.c_str());
+
+    ImGui::SameLine();
+    ImGui::TextDisabled("|");
+    ImGui::SameLine();
+    ImGui::Text("Scene: %s", m_scenePathBuffer);
+
+    ImGui::SameLine();
+    ImGui::TextDisabled("|");
+    ImGui::SameLine();
+    ImGui::Text("%d selected", m_hierarchyPanel.getSelected() ? 1 : 0);
+
+    ImGui::SameLine();
+    ImGui::TextDisabled("|");
+    ImGui::SameLine();
+    const char* stateLabel = m_playState == EditorPlayState::Edit      ? "Edit Mode"
+                              : m_playState == EditorPlayState::Playing ? "Playing"
+                                                                        : "Paused";
+    ImGui::TextUnformatted(stateLabel);
+
+    char fpsText[32];
+    std::snprintf(fpsText, sizeof(fpsText), "%.1f FPS", ImGui::GetIO().Framerate);
+    float fpsWidth = ImGui::CalcTextSize(fpsText).x;
+    ImGui::SameLine(ImGui::GetWindowWidth() - fpsWidth - 12.0f);
+    ImGui::TextUnformatted(fpsText);
+
+    ImGui::End();
+}
+
+void EditorLayer::drawSaveSceneAsModal() {
+    if (m_openSaveSceneAsModal) {
+        ImGui::OpenPopup("Save Scene As");
+        m_openSaveSceneAsModal = false;
+    }
+
+    ImGui::SetNextWindowSize(ImVec2(420, 0), ImGuiCond_Appearing);
+    if (ImGui::BeginPopupModal("Save Scene As", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::InputText("Scene Path", m_scenePathBuffer, sizeof(m_scenePathBuffer));
+        ImGui::Spacing();
+        if (ImGui::Button("Save", ImVec2(120, 0))) {
+            saveScene();
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", ImVec2(120, 0))) ImGui::CloseCurrentPopup();
+        ImGui::EndPopup();
+    }
+}
+
+void EditorLayer::drawCreatePrefabModal() {
+    if (m_openCreatePrefabModal) {
+        ImGui::OpenPopup("Create Prefab From Selection");
+        m_openCreatePrefabModal = false;
+    }
+
+    ImGui::SetNextWindowSize(ImVec2(420, 0), ImGuiCond_Appearing);
+    if (ImGui::BeginPopupModal("Create Prefab From Selection", nullptr,
+                                ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::InputText("Prefab Path", m_prefabPathBuffer, sizeof(m_prefabPathBuffer));
+        ImGui::Spacing();
+        if (ImGui::Button("Create", ImVec2(120, 0))) {
+            createPrefabFromSelection(m_prefabModalTarget);
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", ImVec2(120, 0))) ImGui::CloseCurrentPopup();
+        ImGui::EndPopup();
+    }
+}
+
+void EditorLayer::onImGuiRender() {
     drawMenuBar();
     drawToolbar();
 
-    ImGui::Begin("Molly Editor - Milestone 8");
-    ImGui::Text("Scene serialization: File > Save/Open Scene, Create Prefab From Selection.");
-    ImGui::Text("Frame time: %.3f ms (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate,
-                ImGui::GetIO().Framerate);
-    ImGui::Text("Hold Right Mouse in the Viewport to fly: WASD + QE, mouse-look (edit mode only).");
+    // Dockspace fills the region between the Toolbar and the Status Bar —
+    // reserving those two strips here (rather than passing the raw main
+    // viewport to DockSpaceOverViewport) is what stops docked panels from
+    // rendering underneath either strip. On first launch (or after a
+    // "Reset Layout"), buildDefaultDockLayout() lays out the standard
+    // Hierarchy/Viewport/Inspector/Content-Browser+Console quadrant
+    // arrangement instead of leaving every panel to ImGui's default
+    // cascade-and-overlap placement. See plan/EDITOR_UI_PLAN.md §7, §8.
+    ImGuiViewport* viewport = ImGui::GetMainViewport();
+    ImVec2 menuBarSize = ImGui::GetFrameHeight() > 0 ? ImVec2(0, ImGui::GetFrameHeight()) : ImVec2(0, 0);
+    ImVec2 dockspacePos =
+        ImVec2(viewport->Pos.x, viewport->Pos.y + menuBarSize.y + kToolbarHeight);
+    ImVec2 dockspaceSize = ImVec2(
+        viewport->Size.x, viewport->Size.y - menuBarSize.y - kToolbarHeight - kStatusBarHeight);
+
+    ImGuiID dockspaceId = ImGui::GetID("MollyMainDockspace");
+
+    if (m_resetLayoutRequested || dockspaceNeedsDefaultLayout(dockspaceId)) {
+        buildDefaultDockLayout(dockspaceId, dockspaceSize);
+        m_resetLayoutRequested = false;
+    }
+
+    ImGui::SetNextWindowPos(dockspacePos);
+    ImGui::SetNextWindowSize(dockspaceSize);
+    ImGuiWindowFlags dockHostFlags = ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar |
+                                      ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize |
+                                      ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus |
+                                      ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_NoBackground;
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+    ImGui::Begin("##MollyDockHost", nullptr, dockHostFlags);
+    ImGui::PopStyleVar(3);
+    ImGui::DockSpace(dockspaceId, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_PassthruCentralNode);
     ImGui::End();
+
+    drawStatusBar();
+    drawSaveSceneAsModal();
+    drawCreatePrefabModal();
 
     Scene* scene = activeScene();
     m_hierarchyPanel.setContext(scene);

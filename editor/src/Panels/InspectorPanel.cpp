@@ -9,11 +9,22 @@ namespace molly {
 template <typename T, typename Fn>
 static void drawComponent(const char* name, Entity entity, Fn drawFunc) {
     if (!entity.hasComponent<T>()) return;
-    if (ImGui::CollapsingHeader(name, ImGuiTreeNodeFlags_DefaultOpen)) {
-        ImGui::PushID(name);
-        drawFunc(entity.getComponent<T>());
-        ImGui::PopID();
+
+    ImGui::PushID(name);
+    bool open = ImGui::CollapsingHeader(name, ImGuiTreeNodeFlags_DefaultOpen);
+
+    bool removeRequested = false;
+    if (ImGui::BeginPopupContextItem()) {
+        if (ImGui::MenuItem("Remove Component")) removeRequested = true;
+        ImGui::EndPopup();
     }
+
+    if (open) {
+        drawFunc(entity.getComponent<T>());
+    }
+    ImGui::PopID();
+
+    if (removeRequested) entity.removeComponent<T>();
 }
 
 static void editString(const char* label, std::string& value) {
@@ -26,7 +37,8 @@ static void editString(const char* label, std::string& value) {
 }
 
 void InspectorPanel::onImGuiRender(Scene* scene, Entity selected) {
-    ImGui::Begin("Inspector");
+    if (!isOpen) return;
+    ImGui::Begin("Inspector", &isOpen);
 
     if (!scene || !selected) {
         ImGui::TextDisabled("No entity selected");
