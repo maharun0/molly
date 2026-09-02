@@ -11,6 +11,7 @@
 #include "molly/core/Layer.h"
 #include "molly/core/Log.h"
 #include "molly/core/Time.h"
+#include "molly/core/PlatformUtils.h"
 #include "molly/core/Window.h"
 
 #include "molly/core/Events/Event.h"

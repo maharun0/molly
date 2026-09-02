@@ -8,6 +8,7 @@ public:
 };
 
 int main() {
+    molly::setWorkingDirectoryToExecutable();
     molly::Log::init();
     MOLLY_INFO("Molly Demo starting up");
 
