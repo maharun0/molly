@@ -59,6 +59,12 @@ public:
     void setTitle(const std::string& title);
     const std::string& getTitle() const { return m_data.title; }
 
+    // Loads `path` (any stb_image-supported format) and sets it as the
+    // window's title-bar/taskbar icon. No-op with a logged error if the
+    // file can't be decoded — callers don't need a fallback icon, a running
+    // app without a custom icon is a fine degraded state.
+    void setIcon(const std::string& path);
+
     GLFWwindow* getNativeWindow() const { return m_window; }
 
 private:

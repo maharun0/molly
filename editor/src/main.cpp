@@ -14,6 +14,7 @@ int main() {
     MOLLY_INFO("Molly Editor starting up");
 
     EditorApplication app;
+    app.getWindow().setIcon("assets/icons/molly.jpg");
     app.run();
 
     return 0;

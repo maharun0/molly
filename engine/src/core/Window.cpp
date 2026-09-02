@@ -3,6 +3,7 @@
 #include <glad/gl.h>
 
 #include <GLFW/glfw3.h>
+#include <stb_image.h>
 
 #include "molly/core/Assert.h"
 #include "molly/core/Events/KeyEvent.h"
@@ -164,6 +165,23 @@ void Window::setVSync(bool enabled) {
 void Window::setTitle(const std::string& title) {
     m_data.title = title;
     glfwSetWindowTitle(m_window, title.c_str());
+}
+
+void Window::setIcon(const std::string& path) {
+    int width = 0, height = 0, channels = 0;
+    stbi_uc* pixels = stbi_load(path.c_str(), &width, &height, &channels, 4);
+    if (!pixels) {
+        MOLLY_ERROR("Failed to load window icon: {0}", path);
+        return;
+    }
+
+    GLFWimage image;
+    image.width = width;
+    image.height = height;
+    image.pixels = pixels;
+    glfwSetWindowIcon(m_window, 1, &image);
+
+    stbi_image_free(pixels);
 }
 
 }  // namespace molly
