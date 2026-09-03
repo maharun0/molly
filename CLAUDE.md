@@ -2,6 +2,20 @@
 
 A from-scratch C++20 game engine (Windows only) with an ImGui-based visual editor, built as a CSE499A capstone project. See `plan/PLAN.md` for the original 10-milestone build plan, `plan/EDITOR_UI_PLAN.md` for the editor UI overhaul, `plan/GAPS_AUDIT.md` for a current what-exists-vs-what's-missing audit, and `reports/CSE499A_Report.tex` for the formal writeup.
 
+## Current Status
+
+CSE499A is functionally complete and the working tree is clean (nothing mid-flight as of this writing): engine + editor + demo game all build and run, the editor UI overhaul is done, and `reports/CSE499A_Report.tex` + `reports/PRESENTATION_NOTES.md` are written and committed. Report deadline was 10:00pm, September 8; presentation slot is a Summer 2026 final-exam slot, Tuesday 11:20am (exact date TBD from the controller's office as of the last update).
+
+Next work is CSE499B, scoped in `plan/GAPS_AUDIT.md` and the report's "What Will Be Completed in CSE499B" section, in priority order:
+
+1. Materials as standalone, reusable assets (currently inline per-entity only).
+2. Runtime scene/level switching (currently exactly one `Scene` for the app's whole lifetime).
+3. A generic runtime "Player" + Build/Export pipeline from the editor (currently shipping a game means hand-writing a `game/`-style C++ project).
+4. A viewport translate/rotate/scale manipulator gizmo (currently Transform is numeric-fields-only).
+5. Expanding automated test coverage to rendering output and physics accuracy (currently serialization-round-trips only) — ongoing, not a single milestone.
+
+If you're picking this up cold: start with whichever of these the user names, or ask which is next if unstated — don't assume priority order overrides an explicit request.
+
 ## Build
 
 Everything is vendored under `vendor/` as git submodules — no vcpkg/Conan, no external package manager. This is a deliberate, explicit project requirement; don't introduce one.
