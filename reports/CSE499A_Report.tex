@@ -73,7 +73,7 @@ Physics Simulation, Scripting, Level Editor
 \end{IEEEkeywords}
 
 % =============================================================================
-\section{Introduction}
+\section{Introduction and Problem Statement}
 % =============================================================================
 
 Real-time 3D applications -- games in particular -- are built on top of
@@ -87,6 +87,28 @@ architecture make them difficult to use as a learning vehicle for
 understanding how an engine's subsystems are actually wired together --
 how a renderer, a physics simulation, a scripting layer, and a visual
 editor combine into a single coherent application.
+
+\subsection{Problem Statement}
+\label{sec:problem}
+
+Existing avenues for learning game engine internals are each
+insufficient on their own. Reading commercial engine source where it is
+available (e.g. Unreal Engine) means navigating a codebase of millions
+of lines built for production concerns -- platform abstraction,
+backward compatibility, plugin systems -- that obscure rather than
+illustrate the core architecture. Small ``build your own engine''
+tutorials, at the other extreme, typically stop at a renderer or a
+minimal ECS and never integrate physics, scripting, serialization, and
+an editor into one coherent, working application, so the reader never
+sees how these subsystems' design decisions constrain each other in
+practice (e.g. how the editor's Play-mode scene cloning interacts with
+physics-world lifetime, discussed in Section~\ref{sec:related}). The
+problem this project addresses is therefore: \emph{build a game engine
+small enough to be understood end-to-end by its own developers, yet
+complete enough -- rendering, ECS, physics, scripting, resource
+management, serialization, audio, and a visual editor -- to validate
+that its subsystems genuinely integrate, rather than existing as
+isolated demonstrations.}
 
 Molly was built to close that gap: a minimal but functionally complete
 engine, small enough to be understood in full, but structured the way a
@@ -243,6 +265,44 @@ This ordering -- update before the ImGui frame begins, event polling
 after everything is presented -- has a subtle consequence discussed in
 Section~\ref{sec:challenges}.
 
+\subsection{Comparison with Existing Engines}
+\label{sec:comparison}
+
+Table~\ref{tab:comparison} positions Molly against the three commercial
+engines discussed in Section~\ref{sec:related}, across axes relevant to
+this project's stated problem (Section~\ref{sec:problem}): source
+availability, scripting approach, and dependency self-containment,
+rather than production-readiness metrics where a two-target-executable
+student project cannot meaningfully compete with engines developed by
+hundreds of engineers over a decade or more.
+
+\begin{table}[htbp]
+\caption{Molly vs.\ established engines, by architectural transparency}
+\label{tab:comparison}
+\centering
+\footnotesize
+\begin{tabular}{lp{1.5cm}p{1.5cm}p{1.5cm}p{1.5cm}}
+\toprule
+& \textbf{Molly} & \textbf{Unity} & \textbf{Unreal} & \textbf{Godot} \\
+\midrule
+Engine source available & Yes, full & No (core closed) & Yes, full & Yes, full \\
+Scripting language & Lua & C\# & C++/ Blueprints & GDScript/C\# \\
+Dependencies & Vendored, no package mgr. & Closed, bundled & Vendored + Perforce & Vendored \\
+Editor included & Yes & Yes & Yes & Yes \\
+Primary design goal & Educational transparency & Production, broad platform reach & Production, AAA fidelity & Production, open-source community \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The comparison's purpose is not to claim feature parity -- Molly has no
+shadows, no PBR materials, and no shipping pipeline
+(Section~\ref{sec:limitations}) -- but to make explicit what Molly
+optimizes for that the others do not: every line between a keystroke in
+the editor and a pixel on screen is first-party code the project's own
+developers wrote and can read, which is precisely the property the
+problem statement (Section~\ref{sec:problem}) identifies as missing from
+existing learning resources.
+
 \subsection{Design Requirements and Constraints}
 \label{sec:requirements}
 
@@ -270,6 +330,71 @@ constrained every subsequent design decision:
           unloaded/placeholder resource) rather than crash the entire
           application -- verified in practice for both cases in
           Section~\ref{sec:testing}.
+\end{itemize}
+
+\subsection{Software Engineering Methodology and Design Patterns}
+\label{sec:se}
+
+Consistent with software engineering practice covered in CSE327, Molly
+was developed under an \textbf{incremental development model} rather
+than a waterfall or big-bang approach: the requirements in
+Section~\ref{sec:requirements} were fixed up front, but implementation
+proceeded as a sequence of independently buildable, independently
+testable increments (renderer, then ECS, then physics, then scripting,
+and so on), each of which left both executables in a working,
+demonstrable state before the next increment began. This is a
+risk-reduction strategy in the classical sense: a defect introduced in
+one increment (Section~\ref{sec:challenges}) is far cheaper to localize
+and fix when only that increment's code has changed since the last known-good
+state, than it would be to debug after all subsystems were written
+simultaneously.
+
+Several standard design patterns and software engineering principles
+are used deliberately, not incidentally:
+
+\begin{itemize}
+    \item \textbf{Layered architecture.} \texttt{molly-engine} exposes a
+          public API consumed identically by \texttt{molly-editor} and
+          \texttt{molly-demo} (Figure~\ref{fig:architecture}); neither
+          consumer depends on the other, and the engine layer depends on
+          neither, enforcing a strict, testable dependency direction.
+    \item \textbf{Composition over inheritance (ECS).} As discussed in
+          Section~\ref{sec:related}, entity behaviour is composed from
+          independent components rather than derived through an
+          inheritance hierarchy, directly avoiding the fragile-base-class
+          and diamond-inheritance problems that hierarchy-based entity
+          designs are documented to suffer from \cite{west-evolve}.
+    \item \textbf{Observer pattern (event dispatch).} Window/input
+          events are dispatched top-down through the layer stack via an
+          \texttt{EventDispatcher}, decoupling event \emph{producers}
+          (GLFW callbacks) from event \emph{consumers} (individual
+          layers), each of which may mark an event handled and stop
+          propagation.
+    \item \textbf{Facade pattern.} \texttt{Application} presents a
+          single, simplified interface (\texttt{run()},
+          \texttt{pushLayer()}, \texttt{getWindow()}, ...) over several
+          independently complex subsystems (windowing, resource
+          management, audio, ImGui), so a consumer never needs to
+          understand or directly wire together their internal
+          interactions.
+    \item \textbf{Separation of concerns (Model-View).} A \texttt{Scene}
+          and its entities are pure data with no rendering or UI
+          knowledge; the editor's panels (Hierarchy, Inspector, Viewport)
+          are a separate, replaceable presentation layer over that same
+          data, and the same \texttt{Scene} is consumed with zero
+          modification by the non-visual \texttt{molly-demo} game.
+    \item \textbf{Verification and validation.} Automated unit/integration
+          testing (Catch2, Section~\ref{sec:testing}) validates
+          component-level correctness; manual/structural verification
+          (log inspection, \texttt{imgui.ini} structure checks) validates
+          behaviour the automated suite does not yet reach -- an
+          explicit, acknowledged gap (Section~\ref{sec:limitations})
+          rather than an oversight.
+    \item \textbf{Version control discipline.} The project uses a
+          single-trunk git workflow with all third-party code isolated
+          under \texttt{vendor/} as pinned submodules, keeping first-party
+          history (Table~\ref{tab:results}) cleanly separated from
+          dependency history.
 \end{itemize}
 
 % =============================================================================
@@ -454,9 +579,12 @@ time under increasing entity/light counts, is proposed as part of
 CSE499B (Section~\ref{sec:limitations}).
 
 % =============================================================================
-\section{Limitations and Future Work}
+\section{Limitations and What Will Be Completed in CSE499B}
 \label{sec:limitations}
 % =============================================================================
+
+\subsection{Current Limitations}
+\label{sec:current-limitations}
 
 A structured audit of the engine's current state was carried out at the
 end of CSE499A, distinguishing what exists from what a comparable
@@ -485,6 +613,9 @@ Script editing & External editor only & In-editor code editor \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+\subsection{What Will Be Completed in CSE499B}
+\label{sec:next}
 
 Based on this audit, four items are proposed as priorities for CSE499B:
 (1) materials as standalone, reusable assets, so a material can be
