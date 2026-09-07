@@ -11,7 +11,7 @@
 \usepackage{booktabs}
 \usepackage{url}
 \usepackage{tikz}
-\usetikzlibrary{positioning,arrows.meta,calc}
+\usetikzlibrary{positioning,arrows.meta,calc,shadows}
 \def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
     T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
 
@@ -23,12 +23,26 @@
 % Author block
 % ---------------------------------------------------------------------------
 \author{
-\IEEEauthorblockN{Maharun Afroz, Nasif Atique Chowdhury, and Dr. Shahnewaz Siddique}
+\IEEEauthorblockN{Maharun Afroz}
 \IEEEauthorblockA{
 \textit{Dept. of Electrical and Computer Engineering} \\
 \textit{North South University} \\
 Dhaka, Bangladesh \\
-maharun.afroz@northsouth.edu, nasif.chowdhury01@northsouth.edu, shahnewaz.siddique@northsouth.edu}
+maharun.afroz@northsouth.edu}
+\and
+\IEEEauthorblockN{Nasif Atique Chowdhury}
+\IEEEauthorblockA{
+\textit{Dept. of Electrical and Computer Engineering} \\
+\textit{North South University} \\
+Dhaka, Bangladesh \\
+nasif.chowdhury01@northsouth.edu}
+\and
+\IEEEauthorblockN{Dr. Shahnewaz Siddique}
+\IEEEauthorblockA{
+\textit{Dept. of Electrical and Computer Engineering} \\
+\textit{North South University} \\
+Dhaka, Bangladesh \\
+shahnewaz.siddique@northsouth.edu}
 }
 
 \maketitle
@@ -186,25 +200,39 @@ libraries listed in Table~\ref{tab:vendor}.
 
 \begin{figure}[htbp]
 \centering
+\definecolor{appFill}{RGB}{215,232,255}
+\definecolor{appLine}{RGB}{31,86,163}
+\definecolor{engFill}{RGB}{255,228,196}
+\definecolor{engLine}{RGB}{184,97,20}
+\definecolor{vendFill}{RGB}{230,230,230}
+\definecolor{vendLine}{RGB}{90,90,90}
 \begin{tikzpicture}[
-    box/.style={draw, rounded corners, align=center, minimum height=0.9cm, font=\footnotesize},
-    arrow/.style={-{Latex[length=2mm]}, thick}
+    box/.style={draw, rounded corners, align=center, minimum height=0.9cm,
+        font=\footnotesize, line width=0.9pt, drop shadow},
+    arrow/.style={-{Latex[length=2.2mm]}, thick}
 ]
-\node[box, minimum width=2.6cm] (editor) at (0,3) {molly-editor \\ (executable)};
-\node[box, minimum width=2.6cm] (demo) at (3.2,3) {molly-demo \\ (executable)};
-\node[box, minimum width=5.8cm, text width=5.4cm] (engine) at (1.6,1.4)
-    {molly-engine (static library) \\[2pt]
+\node[box, fill=appFill, draw=appLine, minimum width=2.6cm]
+    (editor) at (0,3.1) {\textbf{molly-editor} \\ (executable)};
+\node[box, fill=appFill, draw=appLine, minimum width=2.6cm]
+    (demo) at (3.2,3.1) {\textbf{molly-demo} \\ (executable)};
+\node[box, fill=engFill, draw=engLine, minimum width=5.8cm, text width=5.4cm]
+    (engine) at (1.6,1.5)
+    {\textbf{molly-engine} (static library) \\[2pt]
      \scriptsize Application/Layer stack \textbar\ Renderer \textbar\ ECS \\
      \scriptsize Physics \textbar\ Scripting \textbar\ Resources \\
      \scriptsize Audio \textbar\ Scene Serialization};
-\node[box, minimum width=5.8cm, text width=5.4cm] (vendor) at (1.6,-0.4)
-    {\texttt{vendor/} (third-party, git submodules) \\[2pt]
+\node[box, fill=vendFill, draw=vendLine, minimum width=5.8cm, text width=5.4cm]
+    (vendor) at (1.6,-0.4)
+    {\textbf{\texttt{vendor/}} (third-party, git submodules) \\[2pt]
      \scriptsize GLFW \textbar\ GLM \textbar\ entt \textbar\ Jolt \textbar\ sol2 \\
      \scriptsize Dear ImGui \textbar\ Assimp \textbar\ miniaudio \\
      \scriptsize spdlog \textbar\ nlohmann/json \textbar\ Catch2};
-\draw[arrow] (editor) -- (engine);
-\draw[arrow] (demo) -- (engine);
-\draw[arrow] (engine) -- (vendor);
+\draw[arrow, appLine] (editor) -- (engine);
+\draw[arrow, appLine] (demo) -- (engine);
+\draw[arrow, engLine] (engine) -- (vendor);
+\node[font=\scriptsize\itshape, gray, anchor=east] at (-1.55,3.1) {Applications};
+\node[font=\scriptsize\itshape, gray, anchor=east] at (-1.55,1.5) {Engine};
+\node[font=\scriptsize\itshape, gray, anchor=east] at (-1.55,-0.4) {Third-party};
 \end{tikzpicture}
 \caption{Molly's build-target layering: independent executables linking
 a shared engine static library, itself built on vendored third-party
@@ -418,6 +446,31 @@ markers for light and camera entities, which render no mesh of their
 own and would otherwise be impossible to locate or select in the 3D
 view.
 
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+    panel/.style={draw, rounded corners, align=center, font=\scriptsize,
+        line width=0.8pt, drop shadow},
+    bar/.style={draw, align=center, font=\scriptsize, line width=0.8pt}
+]
+\node[bar, fill=engFill, draw=engLine, minimum width=8cm, minimum height=0.4cm]
+    (toolbar) at (4,4.7) {Toolbar (Play / Pause / Stop)};
+\node[panel, fill=appFill, draw=appLine, minimum width=2cm, minimum height=3.4cm]
+    (hierarchy) at (1,2.8) {Hierarchy};
+\node[panel, fill=vendFill, draw=vendLine, minimum width=4cm, minimum height=3.4cm]
+    (viewport) at (4,2.8) {Viewport \\ \scriptsize (fly camera, gizmos,\\ \scriptsize selection outline)};
+\node[panel, fill=appFill, draw=appLine, minimum width=2cm, minimum height=3.4cm]
+    (inspector) at (7,2.8) {Inspector};
+\node[panel, fill=appFill, draw=appLine, minimum width=8cm, minimum height=1cm]
+    (bottom) at (4,0.6) {Content Browser / Console (tabbed)};
+\node[bar, fill=vendFill, draw=vendLine, minimum width=8cm, minimum height=0.35cm]
+    (status) at (4,-0.4) {Status bar};
+\end{tikzpicture}
+\caption{The editor's default docking layout, constructed once via
+ImGui's dock-builder API on first run.}
+\label{fig:editor-layout}
+\end{figure}
+
 % =============================================================================
 \section{Engineering Challenges}
 \label{sec:challenges}
@@ -448,7 +501,34 @@ panel's per-frame update function, which the application loop runs
 \emph{before} that new-frame call, so it was always reading a stale
 value. Moving the read to the panel's ImGui-render function, alongside
 the existing hover-detection code that already ran in the correct order,
-resolved the issue.
+resolved the issue. Figure~\ref{fig:frame-loop} shows the relevant
+portion of the application's per-frame execution order.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+    step/.style={draw, rounded corners, align=center, font=\scriptsize,
+        line width=0.8pt, minimum width=4.6cm, minimum height=0.7cm, drop shadow},
+    arrow/.style={-{Latex[length=2mm]}, thick}
+]
+\node[step, fill=vendFill, draw=vendLine] (update) at (0,4.2) {\texttt{onUpdate()} -- all layers};
+\node[step, fill=engFill, draw=engLine] (begin) at (0,3.0) {\texttt{ImGuiLayer::begin()} (\texttt{NewFrame})};
+\node[step, fill=appFill, draw=appLine] (render) at (0,1.8) {\texttt{onImGuiRender()} -- all layers};
+\node[step, fill=engFill, draw=engLine] (end) at (0,0.6) {\texttt{ImGuiLayer::end()}};
+\node[step, fill=vendFill, draw=vendLine] (window) at (0,-0.6) {\texttt{Window::onUpdate()} (swap, poll)};
+\draw[arrow] (update) -- (begin);
+\draw[arrow] (begin) -- (render);
+\draw[arrow] (render) -- (end);
+\draw[arrow] (end) -- (window);
+\draw[arrow] (window.west) .. controls +(-1.3,0) and +(-1.3,0) .. (update.west);
+\node[font=\tiny\itshape, gray, anchor=west] at (2.45,3.6) {mouse-wheel data valid from here};
+\draw[dashed, gray] (-2.3,3.6) -- (2.4,3.6);
+\end{tikzpicture}
+\caption{Application frame-loop order. Reading ImGui's per-frame input
+state (e.g.\ \texttt{io.MouseWheel}) before \texttt{ImGuiLayer::begin()}
+returns a stale value from the previous frame.}
+\label{fig:frame-loop}
+\end{figure}
 
 \subsection{Working-Directory Dependence}
 Every relative asset path in the engine (shaders, textures, models, log
