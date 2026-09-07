@@ -23,26 +23,12 @@
 % Author block
 % ---------------------------------------------------------------------------
 \author{
-\IEEEauthorblockN{Maharun Afroz}
+\IEEEauthorblockN{Maharun Afroz, Nasif Atique Chowdhury, and Dr. Shahnewaz Siddique}
 \IEEEauthorblockA{
 \textit{Dept. of Electrical and Computer Engineering} \\
 \textit{North South University} \\
 Dhaka, Bangladesh \\
-maharun.afroz@northsouth.edu}
-\and
-\IEEEauthorblockN{Nasif Atique Chowdhury}
-\IEEEauthorblockA{
-\textit{Dept. of Electrical and Computer Engineering} \\
-\textit{North South University} \\
-Dhaka, Bangladesh \\
-nasif.chowdhury01@northsouth.edu}
-\and
-\IEEEauthorblockN{Dr. Shahnewaz Siddique}
-\IEEEauthorblockA{
-\textit{Dept. of Electrical and Computer Engineering} \\
-\textit{North South University} \\
-Dhaka, Bangladesh \\
-shahnewaz.siddique@northsouth.edu}
+maharun.afroz@northsouth.edu, nasif.chowdhury01@northsouth.edu, shahnewaz.siddique@northsouth.edu}
 }
 
 \maketitle
@@ -276,23 +262,23 @@ rather than production-readiness metrics where a two-target-executable
 student project cannot meaningfully compete with engines developed by
 hundreds of engineers over a decade or more.
 
-\begin{table}[htbp]
+\begin{table*}[t]
 \caption{Molly vs.\ established engines, by architectural transparency}
 \label{tab:comparison}
 \centering
-\footnotesize
-\begin{tabular}{lp{1.5cm}p{1.5cm}p{1.5cm}p{1.5cm}}
+\small
+\begin{tabular}{lp{3.4cm}p{3.4cm}p{3.4cm}p{3.4cm}}
 \toprule
 & \textbf{Molly} & \textbf{Unity} & \textbf{Unreal} & \textbf{Godot} \\
 \midrule
 Engine source available & Yes, full & No (core closed) & Yes, full & Yes, full \\
-Scripting language & Lua & C\# & C++/ Blueprints & GDScript/C\# \\
-Dependencies & Vendored, no package mgr. & Closed, bundled & Vendored + Perforce & Vendored \\
+Scripting language & Lua & C\# & C++ / Blueprints & GDScript / C\# \\
+Dependencies & Vendored, no package manager & Closed, bundled & Vendored + Perforce & Vendored \\
 Editor included & Yes & Yes & Yes & Yes \\
 Primary design goal & Educational transparency & Production, broad platform reach & Production, AAA fidelity & Production, open-source community \\
 \bottomrule
 \end{tabular}
-\end{table}
+\end{table*}
 
 The comparison's purpose is not to claim feature parity -- Molly has no
 shadows, no PBR materials, and no shipping pipeline
@@ -510,15 +496,17 @@ against whatever scene happens to already be open.
 % =============================================================================
 
 Correctness was validated at two levels. A Catch2-based automated test
-suite exercises the engine's serialization round-trips (scene and prefab
-save/load producing an equivalent entity graph) and core component
-behaviour (transform, physics, light, camera, and script components);
-at the end of CSE499A the suite comprises 45 assertions across 7 test
-cases, all passing. This suite does \emph{not} cover rendering output
-correctness, physics simulation accuracy, or editor UI behaviour --
-all three currently rely on the manual/structural verification described
-below, and are identified as an automated-coverage gap in
-Section~\ref{sec:limitations}.
+suite exercises the engine's serialization round-trips: a scene or prefab
+is built in memory, saved to JSON, reloaded, and the resulting entity
+graph is asserted equal to the original across the following component
+types -- transform, light, rigid body and collider, character
+controller, script, camera, and hierarchy (parent/child relationships).
+At the end of CSE499A the suite comprises 45 assertions across 7 test
+cases, all passing, running in under 0.3 seconds. This suite does
+\emph{not} cover rendering output correctness, physics simulation
+accuracy, or editor UI behaviour -- all three currently rely on the
+manual/structural verification described below, and are identified as
+an automated-coverage gap in Section~\ref{sec:limitations}.
 
 Because visual correctness cannot be captured by unit tests alone,
 editor changes were additionally verified by running the built
