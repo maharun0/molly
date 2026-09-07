@@ -11,9 +11,18 @@
 \usepackage{booktabs}
 \usepackage{url}
 \usepackage{tikz}
-\usetikzlibrary{positioning,arrows.meta,calc,shadows}
+\usetikzlibrary{positioning,arrows.meta,calc}
 \def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
     T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+
+% Shared figure palette (defined once here so every diagram sees the
+% same names, regardless of which figure happens to compile/render first).
+\definecolor{appFill}{RGB}{215,232,255}
+\definecolor{appLine}{RGB}{31,86,163}
+\definecolor{engFill}{RGB}{255,228,196}
+\definecolor{engLine}{RGB}{184,97,20}
+\definecolor{vendFill}{RGB}{230,230,230}
+\definecolor{vendLine}{RGB}{90,90,90}
 
 \begin{document}
 
@@ -200,15 +209,9 @@ libraries listed in Table~\ref{tab:vendor}.
 
 \begin{figure}[htbp]
 \centering
-\definecolor{appFill}{RGB}{215,232,255}
-\definecolor{appLine}{RGB}{31,86,163}
-\definecolor{engFill}{RGB}{255,228,196}
-\definecolor{engLine}{RGB}{184,97,20}
-\definecolor{vendFill}{RGB}{230,230,230}
-\definecolor{vendLine}{RGB}{90,90,90}
 \begin{tikzpicture}[
     box/.style={draw, rounded corners, align=center, minimum height=0.9cm,
-        font=\footnotesize, line width=0.9pt, drop shadow},
+        font=\footnotesize, line width=0.9pt},
     arrow/.style={-{Latex[length=2.2mm]}, thick}
 ]
 \node[box, fill=appFill, draw=appLine, minimum width=2.6cm]
@@ -450,7 +453,7 @@ view.
 \centering
 \begin{tikzpicture}[
     panel/.style={draw, rounded corners, align=center, font=\scriptsize,
-        line width=0.8pt, drop shadow},
+        line width=0.8pt},
     bar/.style={draw, align=center, font=\scriptsize, line width=0.8pt}
 ]
 \node[bar, fill=engFill, draw=engLine, minimum width=8cm, minimum height=0.4cm]
@@ -508,7 +511,7 @@ portion of the application's per-frame execution order.
 \centering
 \begin{tikzpicture}[
     step/.style={draw, rounded corners, align=center, font=\scriptsize,
-        line width=0.8pt, minimum width=4.6cm, minimum height=0.7cm, drop shadow},
+        line width=0.8pt, minimum width=4.6cm, minimum height=0.7cm},
     arrow/.style={-{Latex[length=2mm]}, thick}
 ]
 \node[step, fill=vendFill, draw=vendLine] (update) at (0,4.2) {\texttt{onUpdate()} -- all layers};
